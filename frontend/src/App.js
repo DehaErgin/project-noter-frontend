@@ -1,12 +1,15 @@
 import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import './App.css';
 import GradeCalculator from './components/GradeCalculator';
 
 function App() {
   return (
-    <div className="App">
-      <GradeCalculator />
-    </div>
+    <BrowserRouter>
+      <div className="App">
+        <GradeCalculator />
+      </div>
+    </BrowserRouter>
   );
 }
 
