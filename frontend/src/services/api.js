@@ -115,3 +115,36 @@ export const programOutcomeAPI = {
   },
 };
 
+// Enrollments API
+export const enrollmentsAPI = {
+  getAll: async () => {
+    return apiRequest('/enrollments/');
+  },
+  getById: async (id) => {
+    return apiRequest(`/enrollments/${id}/`);
+  },
+  create: async (data) => {
+    return apiRequest('/enrollments/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update: async (id, data) => {
+    return apiRequest(`/enrollments/${id}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete: async (id) => {
+    return apiRequest(`/enrollments/${id}/`, {
+      method: 'DELETE',
+    });
+  },
+  getByStudent: async (studentId) => {
+    return apiRequest(`/enrollments/by_student/?student_id=${encodeURIComponent(studentId)}`);
+  },
+  getByCourse: async (courseId) => {
+    return apiRequest(`/enrollments/by_course/?course_id=${encodeURIComponent(courseId)}`);
+  },
+};
+
