@@ -1,22 +1,30 @@
 // API Base URL - Django backend endpoint
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000/api';
 
 // Helper function for API requests
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
+  const { method, headers, body, ...restOptions } = options;
   const config = {
+    method: method || 'GET',
+    mode: 'cors', // Enable CORS
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...headers,
     },
-    ...options,
+    ...restOptions,
   };
+
+  // Add body if provided
+  if (body) {
+    config.body = body;
+  }
 
   try {
     const response = await fetch(url, config);
     
     // Handle empty responses (e.g., DELETE requests)
-    if (response.status === 204 || response.status === 201 && response.headers.get('content-length') === '0') {
+    if (response.status === 204 || (response.status === 201 && response.headers.get('content-length') === '0')) {
       return null;
     }
 
@@ -29,6 +37,11 @@ const apiRequest = async (endpoint, options = {}) => {
     const data = await response.json();
     return data;
   } catch (error) {
+    // Better error handling for connection issues
+    if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+      console.error(`API request failed: Cannot connect to ${url}. Make sure the backend server is running.`);
+      throw new Error(`Connection refused: Backend server at ${API_BASE_URL} is not accessible.`);
+    }
     console.error('API request failed:', error);
     throw error;
   }
