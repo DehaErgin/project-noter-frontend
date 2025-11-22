@@ -46,8 +46,11 @@
   color: white;
   border: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -55,6 +58,7 @@
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .add-button:hover {
@@ -159,6 +163,68 @@
   border-color: #cbd5e1;
 }
 
+.item-editing {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.edit-name-input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.edit-name-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.small-button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.small-button.save {
+  background-color: #22c55e;
+  color: white;
+}
+
+.small-button.save:disabled {
+  background-color: #a7f3d0;
+  color: #047857;
+  cursor: not-allowed;
+}
+
+.small-button.save:not(:disabled):hover {
+  background-color: #16a34a;
+}
+
+.small-button.cancel {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.small-button.cancel:hover {
+  background-color: #e2e8f0;
+}
+
 .item-content {
   display: flex;
   flex-direction: column;
@@ -210,6 +276,22 @@
 .item-actions {
   display: flex;
   gap: 8px;
+}
+
+.edit-button {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.edit-button:hover {
+  background-color: #bae6fd;
 }
 
 .delete-button {
