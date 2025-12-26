@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { useOutletContext, useSearchParams, useNavigate } from 'react-router-dom';
 import useAsyncResource from '../../hooks/useAsyncResource';
 import adminService from '../../services/adminService';
 import LoadingState from '../../components/common/LoadingState';
@@ -12,6 +12,7 @@ import clsx from 'clsx';
 const Users = () => {
   const { adminId } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const activeTab = searchParams.get('tab') || 'students';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,6 +29,11 @@ const Users = () => {
   });
   const [selectedCourse, setSelectedCourse] = useState('');
   const [courses, setCourses] = useState([]);
+  const [studentOptions, setStudentOptions] = useState({
+    majors: [],
+    cohorts: [],
+    advisors: []
+  });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -42,6 +48,38 @@ const Users = () => {
   const { data: professorsData, isLoading: professorsLoading, error: professorsError, refetch: refetchProfessors } = useAsyncResource(
     professorsLoader
   );
+
+  // Load student options from localStorage and merge with existing student and professor data
+  useEffect(() => {
+    const storedOptions = adminService.getStudentOptions();
+    
+    // Extract unique values from students
+    const majorsFromStudents = studentsData && studentsData.length > 0 
+      ? [...new Set(studentsData.filter(s => s.major).map(s => s.major))].sort()
+      : [];
+    
+    const cohortsFromStudents = studentsData && studentsData.length > 0
+      ? [...new Set(studentsData.filter(s => s.cohort).map(s => s.cohort))].sort()
+      : [];
+    
+    const advisorsFromStudents = studentsData && studentsData.length > 0
+      ? [...new Set(studentsData.filter(s => s.advisor).map(s => s.advisor))].sort()
+      : [];
+    
+    // Extract advisor names from professors (professors can be advisors)
+    const advisorsFromProfessors = professorsData && professorsData.length > 0
+      ? [...new Set(professorsData.filter(p => p.name).map(p => p.name))].sort()
+      : [];
+    
+    // Merge stored options with values from students and professors (avoid duplicates)
+    const mergedOptions = {
+      majors: [...new Set([...storedOptions.majors, ...majorsFromStudents])].sort(),
+      cohorts: [...new Set([...storedOptions.cohorts, ...cohortsFromStudents])].sort(),
+      advisors: [...new Set([...storedOptions.advisors, ...advisorsFromStudents, ...advisorsFromProfessors])].sort()
+    };
+    
+    setStudentOptions(mergedOptions);
+  }, [studentsData, professorsData]);
 
   const coursesLoader = useCallback(() => adminService.getCourses(), []);
   const { data: coursesData } = useAsyncResource(coursesLoader);
@@ -266,12 +304,25 @@ const Users = () => {
         customActions={
           isStudentTab
             ? (row) => (
-                <button
-                  onClick={() => handleOpenAssignModal(row)}
-                  className="px-3 py-1.5 text-sm font-medium text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                >
-                  Assign Course
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const studentId = row.student_id || row.id.toString();
+                      localStorage.setItem('studentId', studentId);
+                      navigate(`/student/dashboard?studentId=${studentId}`);
+                    }}
+                    className="px-3 py-1.5 text-sm font-medium text-brand-600 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                    title="View as Student"
+                  >
+                    View
+                  </button>
+                  <button
+                    onClick={() => handleOpenAssignModal(row)}
+                    className="px-3 py-1.5 text-sm font-medium text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                  >
+                    Assign Course
+                  </button>
+                </div>
               )
             : null
         }
@@ -316,23 +367,29 @@ const Users = () => {
               <FormField
                 label="Major"
                 name="major"
+                type="select"
                 value={formData.major}
                 onChange={(e) => setFormData({ ...formData, major: e.target.value })}
-                placeholder="Enter major"
+                options={studentOptions.majors.map(major => ({ value: major, label: major }))}
+                placeholder="Select or enter major"
               />
               <FormField
                 label="Cohort"
                 name="cohort"
+                type="select"
                 value={formData.cohort}
                 onChange={(e) => setFormData({ ...formData, cohort: e.target.value })}
-                placeholder="Enter cohort"
+                options={studentOptions.cohorts.map(cohort => ({ value: cohort, label: cohort }))}
+                placeholder="Select or enter cohort"
               />
               <FormField
                 label="Advisor"
                 name="advisor"
+                type="select"
                 value={formData.advisor}
                 onChange={(e) => setFormData({ ...formData, advisor: e.target.value })}
-                placeholder="Enter advisor name"
+                options={studentOptions.advisors.map(advisor => ({ value: advisor, label: advisor }))}
+                placeholder="Select or enter advisor"
               />
             </>
           )}

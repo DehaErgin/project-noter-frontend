@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
+import { NavLink, Outlet, useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
@@ -13,7 +13,19 @@ const navItems = [
 const StudentLayout = () => {
   const [theme, setTheme] = useState('light');
   const [searchParams] = useSearchParams();
-  const studentId = searchParams.get('studentId') || 'current';
+  const navigate = useNavigate();
+  
+  // Get studentId from URL parameter, localStorage, or default to 'current'
+  const urlStudentId = searchParams.get('studentId');
+  const storedStudentId = localStorage.getItem('studentId');
+  const studentId = urlStudentId || storedStudentId || 'current';
+  
+  // If no studentId found, redirect to login
+  useEffect(() => {
+    if (!urlStudentId && !storedStudentId) {
+      navigate('/student/login');
+    }
+  }, [urlStudentId, storedStudentId, navigate]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -33,24 +45,35 @@ const StudentLayout = () => {
               <p className="text-xs font-semibold tracking-[0.3em] uppercase text-brand-500">Student</p>
               <h1 className="text-2xl font-semibold">Learning Analytics Panel</h1>
             </div>
-            <button
-              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-              className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
-            >
-              {theme === 'light' ? 'Dark theme' : 'Light theme'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('studentId');
+                  navigate('/student/login');
+                }}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-700 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Logout
+              </button>
+              <button
+                onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
+              >
+                {theme === 'light' ? 'Dark theme' : 'Light theme'}
+              </button>
+            </div>
           </div>
           <nav className="w-full border-t border-slate-200 dark:border-slate-800">
             <div className="flex flex-wrap w-full max-w-6xl px-4 mx-auto">
               {navItems.map((item) => (
                 <NavLink
                   key={item.to}
-                  to={item.to}
+                  to={`${item.to}?studentId=${studentId}`}
                   className={({ isActive }) =>
                     clsx(
                       'px-4 py-3 text-sm font-semibold transition border-b-2 -mb-px',
                       isActive
-                        ? 'border-brand-500 text-brand-600'
+                        ? 'border-brand-500 text-brand-600 dark:text-brand-400'
                         : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     )
                   }

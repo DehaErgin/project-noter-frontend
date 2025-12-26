@@ -159,6 +159,33 @@ const adminService = {
   rejectRequest: async (approvalId) => {
     const { data } = await apiClient.post(`/admin/approvals/${approvalId}/reject/`);
     return data;
+  },
+
+  // Student Options (for dropdowns) - gets from localStorage or returns defaults
+  getStudentOptions: () => {
+    try {
+      const stored = localStorage.getItem('studentOptions');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (error) {
+      console.error('Error loading student options:', error);
+    }
+    // Return defaults if nothing stored
+    return {
+      majors: [],
+      cohorts: [],
+      advisors: []
+    };
+  },
+
+  // Save student options to localStorage
+  saveStudentOptions: (options) => {
+    try {
+      localStorage.setItem('studentOptions', JSON.stringify(options));
+    } catch (error) {
+      console.error('Error saving student options:', error);
+    }
   }
 };
 

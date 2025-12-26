@@ -8,6 +8,7 @@ const navItems = [
   { to: '/admin/learning-outcomes', label: 'Learning Outcomes' },
   { to: '/admin/courses', label: 'Courses' },
   { to: '/admin/users', label: 'Users' },
+  { to: '/admin/student-options', label: 'Student Options' },
   { to: '/admin/approvals', label: 'Approvals' }
 ];
 
