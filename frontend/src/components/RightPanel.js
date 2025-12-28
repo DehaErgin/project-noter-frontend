@@ -10,8 +10,7 @@ const RightPanel = ({
   programOutcomeComponents,
   setAssessmentComponents,
   setLearningOutcomeComponents,
-  onUpdateAssessment,
-  onUpdateLearningOutcome
+  courseStudents
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -127,9 +126,31 @@ const RightPanel = ({
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <p>No assessment components yet. Add one from the left panel.</p>
+          </div>
+        )}
+
+        {/* Learning Outcome Components Cards */}
+        {learningOutcomeComponents.length > 0 && (
+          <div className="cards-section">
+            <h3 className="section-title">Learning Outcome Components</h3>
+            <div className="cards-grid">
+              {learningOutcomeComponents.map((component) => (
+                <ComponentCard
+                  key={component.id}
+                  component={component}
+                  type="learning"
+                  assessments={assessmentComponents}
+                  onUpdate={(updatedComponent) => {
+                    setLearningOutcomeComponents(prev =>
+                      prev.map(comp =>
+                        comp.id === component.id ? updatedComponent : comp
+                      )
+                    );
+                  }}
+                  programOutcomes={programOutcomeComponents}
+                  courseStudents={courseStudents}
+                />
+              ))}
             </div>
           )}
 
