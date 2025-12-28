@@ -8,7 +8,8 @@ const RightPanel = ({
   learningOutcomeComponents,
   programOutcomeComponents,
   setAssessmentComponents,
-  setLearningOutcomeComponents
+  setLearningOutcomeComponents,
+  courseStudents
 }) => {
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'flow'
 
@@ -134,6 +135,7 @@ const RightPanel = ({
                     );
                   }}
                   programOutcomes={programOutcomeComponents}
+                  courseStudents={courseStudents}
                 />
               ))}
             </div>

@@ -2,7 +2,11 @@ import clsx from 'clsx';
 
 const AssessmentList = ({ assessments = [] }) => {
   if (!assessments.length) {
-    return <p className="text-sm text-slate-500">No assessments have been recorded yet.</p>;
+    return (
+      <div className="p-8 text-center bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+        <p className="text-sm text-slate-400 italic">Waiting to upload data...</p>
+      </div>
+    );
   }
 
   return (

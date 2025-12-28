@@ -16,9 +16,11 @@ const Users = () => {
   const activeTab = searchParams.get('tab') || 'students';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isManageCoursesModalOpen, setIsManageCoursesModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [assigningUser, setAssigningUser] = useState(null);
+  const [managingCoursesUser, setManagingCoursesUser] = useState(null);
+  const [studentEnrollments, setStudentEnrollments] = useState([]);
+  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -141,20 +143,234 @@ const Users = () => {
     setSuccess(null);
   };
 
-  const handleOpenAssignModal = (user) => {
-    setAssigningUser(user);
-    setSelectedCourse('');
+  const handleOpenManageCoursesModal = async (user) => {
+    setManagingCoursesUser(user);
     setError(null);
     setSuccess(null);
-    setIsAssignModalOpen(true);
+    setIsManageCoursesModalOpen(true);
+    
+    // Load student enrollments
+    setEnrollmentsLoading(true);
+    try {
+      console.log('[DEBUG] Loading enrollments for user:', user);
+      const enrollments = await adminService.getStudentEnrollments(user.id);
+      console.log('[DEBUG] Loaded enrollments:', enrollments);
+      setStudentEnrollments(enrollments || []);
+    } catch (err) {
+      console.error('[DEBUG] Error loading enrollments:', err);
+      setError(err.message || 'Failed to load student enrollments');
+      setStudentEnrollments([]);
+    } finally {
+      setEnrollmentsLoading(false);
+    }
   };
 
-  const handleCloseAssignModal = () => {
-    setIsAssignModalOpen(false);
-    setAssigningUser(null);
+  const handleCloseManageCoursesModal = () => {
+    setIsManageCoursesModalOpen(false);
+    setManagingCoursesUser(null);
+    setStudentEnrollments([]);
     setSelectedCourse('');
     setError(null);
     setSuccess(null);
+  };
+
+  const handleRemoveCourse = async (enrollmentId) => {
+    if (!window.confirm('Are you sure you want to remove this course from the student?')) return;
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      console.log('[DEBUG] Removing course:', {
+        studentId: managingCoursesUser.id,
+        enrollmentId: enrollmentId
+      });
+      
+      const response = await adminService.removeStudentFromCourse(managingCoursesUser.id, enrollmentId);
+      console.log('[DEBUG] Remove course response:', response);
+      
+      setError(null);
+      setSuccess('Course removed successfully!');
+      
+      // Wait a bit for backend to process
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Refresh enrollments
+      console.log('[DEBUG] Refreshing enrollments after course removal...');
+      const enrollments = await adminService.getStudentEnrollments(managingCoursesUser.id);
+      console.log('[DEBUG] Refreshed enrollments after removal:', enrollments);
+      setStudentEnrollments(Array.isArray(enrollments) ? enrollments : []);
+      
+      // Update localStorage if this is the currently logged in student
+      const storedStudentId = localStorage.getItem('studentId');
+      const managingStudentId = managingCoursesUser?.student_id || managingCoursesUser?.id?.toString();
+      
+      if (storedStudentId && managingStudentId && 
+          (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
+        setTimeout(async () => {
+          try {
+            const students = await adminService.getStudents();
+            const updatedStudentData = students.find(
+              (s) => s.id === managingCoursesUser?.id || 
+                     s.student_id === managingStudentId || 
+                     s.id.toString() === managingStudentId ||
+                     (managingCoursesUser?.id && s.id === managingCoursesUser.id)
+            );
+            if (updatedStudentData) {
+              localStorage.setItem('studentInfo', JSON.stringify({
+                id: updatedStudentData.id,
+                student_id: updatedStudentData.student_id || updatedStudentData.id.toString(),
+                name: updatedStudentData.name,
+                email: updatedStudentData.email,
+                major: updatedStudentData.major,
+                cohort: updatedStudentData.cohort,
+                advisor: updatedStudentData.advisor
+              }));
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: 'studentInfo',
+                newValue: localStorage.getItem('studentInfo')
+              }));
+              window.dispatchEvent(new CustomEvent('studentInfoUpdated'));
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }, 500);
+      }
+      
+      // Refresh students list
+      refetchStudents();
+    } catch (err) {
+      console.error('[DEBUG] ❌ Error removing course:', err);
+      setSuccess(null);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to remove course';
+      setError(errorMessage);
+      console.error('[DEBUG] Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        statusText: err.response?.statusText
+      });
+    }
+  };
+
+  const handleAddCourseFromManageModal = async () => {
+    if (!selectedCourse) {
+      setError('Please select a course');
+      setSuccess(null);
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      console.log('[DEBUG] Adding course:', {
+        studentId: managingCoursesUser.id,
+        courseId: selectedCourse
+      });
+      
+      const response = await adminService.assignStudentToCourse(managingCoursesUser.id, selectedCourse);
+      console.log('[DEBUG] Course assignment response:', response);
+      
+      // Backend returns: {message: "...", enrollment: {...}}
+      // Verify that backend actually created the enrollment
+      if (response && response.enrollment) {
+        console.log('[DEBUG] ✅ Backend created enrollment:', response.enrollment);
+      } else if (response && (response.id || response.course_id)) {
+        console.log('[DEBUG] ✅ Backend returned enrollment data (alternative format):', response);
+      } else {
+        console.warn('[DEBUG] ⚠️ Backend response does not contain enrollment data');
+        console.warn('[DEBUG] Response:', response);
+        // Still try to refresh enrollments in case it was created
+      }
+      
+      // Clear error if any
+      setError(null);
+      setSuccess('Course assigned successfully!');
+      
+      // Wait a bit for backend to process
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Refresh enrollments with retry logic
+      console.log('[DEBUG] Refreshing enrollments after course assignment...');
+      let enrollments = [];
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          enrollments = await adminService.getStudentEnrollments(managingCoursesUser.id);
+          console.log('[DEBUG] Refreshed enrollments (attempt):', enrollments);
+          
+          // If we got enrollments and they include the new course, break
+          if (Array.isArray(enrollments) && enrollments.length > 0) {
+            const hasNewCourse = enrollments.some(e => 
+              e.course?.id?.toString() === selectedCourse.toString() || 
+              e.course_id?.toString() === selectedCourse.toString()
+            );
+            if (hasNewCourse || enrollments.length > studentEnrollments.length) {
+              break;
+            }
+          }
+          
+          // If still no enrollments, wait and retry
+          if (enrollments.length === 0 && retries > 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (err) {
+          console.error('[DEBUG] Error refreshing enrollments:', err);
+        }
+        retries--;
+      }
+      
+      console.log('[DEBUG] Final enrollments:', enrollments);
+      setStudentEnrollments(Array.isArray(enrollments) ? enrollments : []);
+      
+      // Clear selected course
+      setSelectedCourse('');
+      
+      // Update localStorage if this is the currently logged in student
+      const storedStudentId = localStorage.getItem('studentId');
+      const managingStudentId = managingCoursesUser?.student_id || managingCoursesUser?.id?.toString();
+      
+      if (storedStudentId && managingStudentId && 
+          (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
+        setTimeout(async () => {
+          try {
+            const students = await adminService.getStudents();
+            const updatedStudentData = students.find(
+              (s) => s.id === managingCoursesUser?.id || 
+                     s.student_id === managingStudentId || 
+                     s.id.toString() === managingStudentId ||
+                     (managingCoursesUser?.id && s.id === managingCoursesUser.id)
+            );
+            if (updatedStudentData) {
+              localStorage.setItem('studentInfo', JSON.stringify({
+                id: updatedStudentData.id,
+                student_id: updatedStudentData.student_id || updatedStudentData.id.toString(),
+                name: updatedStudentData.name,
+                email: updatedStudentData.email,
+                major: updatedStudentData.major,
+                cohort: updatedStudentData.cohort,
+                advisor: updatedStudentData.advisor
+              }));
+              window.dispatchEvent(new StorageEvent('storage', {
+                key: 'studentInfo',
+                newValue: localStorage.getItem('studentInfo')
+              }));
+              window.dispatchEvent(new CustomEvent('studentInfoUpdated'));
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }, 500);
+      }
+      
+      // Refresh students list
+      refetchStudents();
+    } catch (err) {
+      setError(err.message || 'Failed to assign course');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -164,17 +380,69 @@ const Users = () => {
 
     try {
       if (isStudentTab) {
+        // Prepare formData - ensure all fields are included and trimmed
+        const cleanedFormData = {
+          name: formData.name?.trim() || '',
+          email: formData.email?.trim() || '',
+          student_id: formData.student_id?.trim() || '',
+          major: formData.major?.trim() || '',
+          cohort: formData.cohort?.trim() || '',
+          advisor: formData.advisor?.trim() || ''
+        };
+
         if (editingUser) {
-          await adminService.updateStudent(editingUser.id, formData);
+          await adminService.updateStudent(editingUser.id, cleanedFormData);
           setSuccess('Student updated successfully!');
         } else {
-          await adminService.createStudent(formData);
+          await adminService.createStudent(cleanedFormData);
           setSuccess('Student created successfully!');
         }
-        setTimeout(() => {
-          handleCloseModal();
-          refetchStudents();
-        }, 1000);
+        
+        // Close modal first
+        handleCloseModal();
+        
+        // Refetch students data immediately to update the table
+        await refetchStudents();
+        
+        // Update localStorage if this is the currently logged in student
+        const storedStudentId = localStorage.getItem('studentId');
+        const editingStudentId = editingUser?.student_id || editingUser?.id?.toString();
+        
+        if (storedStudentId && editingStudentId && 
+            (storedStudentId === editingStudentId || storedStudentId === editingUser?.id?.toString())) {
+          // Get the updated student data from the refetched list
+          setTimeout(async () => {
+            try {
+              const students = await adminService.getStudents();
+              const updatedStudentData = students.find(
+                (s) => s.id === editingUser?.id || 
+                       s.student_id === editingStudentId || 
+                       s.id.toString() === editingStudentId ||
+                       (editingUser?.id && s.id === editingUser.id)
+              );
+              if (updatedStudentData) {
+                localStorage.setItem('studentInfo', JSON.stringify({
+                  id: updatedStudentData.id,
+                  student_id: updatedStudentData.student_id || updatedStudentData.id.toString(),
+                  name: updatedStudentData.name,
+                  email: updatedStudentData.email,
+                  major: updatedStudentData.major,
+                  cohort: updatedStudentData.cohort,
+                  advisor: updatedStudentData.advisor
+                }));
+                // Trigger storage event for other tabs/windows
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: 'studentInfo',
+                  newValue: localStorage.getItem('studentInfo')
+                }));
+                // Also dispatch custom event for same-tab listeners
+                window.dispatchEvent(new CustomEvent('studentInfoUpdated'));
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }, 500);
+        }
       } else {
         if (editingUser) {
           await adminService.updateProfessor(editingUser.id, formData);
@@ -190,27 +458,6 @@ const Users = () => {
       }
     } catch (err) {
       setError(err.message || `Failed to save ${isStudentTab ? 'Student' : 'Professor'}`);
-    }
-  };
-
-  const handleAssignCourse = async () => {
-    setError(null);
-    setSuccess(null);
-
-    if (!selectedCourse) {
-      setError('Please select a course');
-      return;
-    }
-
-    try {
-      await adminService.assignStudentToCourse(assigningUser.id, selectedCourse);
-      setSuccess('Student assigned to course successfully!');
-      setTimeout(() => {
-        handleCloseAssignModal();
-        refetchStudents();
-      }, 1000);
-    } catch (err) {
-      setError(err.message || 'Failed to assign student to course');
     }
   };
 
@@ -244,8 +491,9 @@ const Users = () => {
     { key: 'student_id', label: 'Student ID', render: (value, row) => value || row.id },
     { key: 'name', label: 'Name' },
     { key: 'email', label: 'Email' },
-    { key: 'major', label: 'Major' },
-    { key: 'cohort', label: 'Cohort' }
+    { key: 'major', label: 'Major', render: (value) => value || 'N/A' },
+    { key: 'cohort', label: 'Cohort', render: (value) => value || 'N/A' },
+    { key: 'advisor', label: 'Advisor', render: (value) => value || 'N/A' }
   ];
 
   const professorColumns = [
@@ -309,6 +557,16 @@ const Users = () => {
                     onClick={() => {
                       const studentId = row.student_id || row.id.toString();
                       localStorage.setItem('studentId', studentId);
+                      // Save student info for quick access
+                      localStorage.setItem('studentInfo', JSON.stringify({
+                        id: row.id,
+                        student_id: row.student_id || row.id.toString(),
+                        name: row.name,
+                        email: row.email,
+                        major: row.major,
+                        cohort: row.cohort,
+                        advisor: row.advisor
+                      }));
                       navigate(`/student/dashboard?studentId=${studentId}`);
                     }}
                     className="px-3 py-1.5 text-sm font-medium text-brand-600 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-500/10"
@@ -317,10 +575,10 @@ const Users = () => {
                     View
                   </button>
                   <button
-                    onClick={() => handleOpenAssignModal(row)}
-                    className="px-3 py-1.5 text-sm font-medium text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                    onClick={() => handleOpenManageCoursesModal(row)}
+                    className="px-3 py-1.5 text-sm font-medium text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10"
                   >
-                    Assign Course
+                    Manage Courses
                   </button>
                 </div>
               )
@@ -426,50 +684,116 @@ const Users = () => {
 
       {isStudentTab && (
         <Modal
-          isOpen={isAssignModalOpen}
-          onClose={handleCloseAssignModal}
-          title={`Assign Course to ${assigningUser?.name}`}
+          isOpen={isManageCoursesModalOpen}
+          onClose={handleCloseManageCoursesModal}
+          title={`Manage Courses for ${managingCoursesUser?.name}`}
         >
           <div className="space-y-4">
-            <FormField
-              label="Course"
-              name="course"
-              type="select"
-              value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              options={courses.map((course) => ({
-                value: course.id,
-                label: `${course.code} - ${course.name}`
-              }))}
-              required
-            />
+            {/* Current Enrollments */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
+                Current Courses
+              </h3>
+              {enrollmentsLoading ? (
+                <p className="text-sm text-slate-400 italic">Loading courses...</p>
+              ) : studentEnrollments.length === 0 ? (
+                <div>
+                  <p className="text-sm text-slate-400 italic">No courses assigned yet.</p>
+                  {process.env.NODE_ENV === 'development' && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Debug: enrollments array length = {studentEnrollments.length}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {studentEnrollments.map((enrollment) => {
+                    console.log('[DEBUG] Rendering enrollment:', {
+                      id: enrollment.id,
+                      enrollmentId: enrollment.id,
+                      course: enrollment.course,
+                      courseId: enrollment.course?.id || enrollment.course_id
+                    });
+                    return (
+                      <div
+                        key={enrollment.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {enrollment.course?.code || 'N/A'} - {enrollment.course?.name || 'N/A'}
+                          </p>
+                          {enrollment.status && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Status: {enrollment.status}
+                            </p>
+                          )}
+                          {process.env.NODE_ENV === 'development' && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              Enrollment ID: {enrollment.id}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            console.log('[DEBUG] Remove button clicked for enrollment:', enrollment.id);
+                            handleRemoveCourse(enrollment.id);
+                          }}
+                          className="px-3 py-1.5 text-sm font-medium text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-            {error && (
-              <div className="p-3 text-sm text-rose-600 bg-rose-50 rounded-lg dark:bg-rose-500/10 dark:text-rose-400">
-                {error}
-              </div>
-            )}
+            {/* Add New Course */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
+                Add New Course
+              </h3>
+              <FormField
+                label="Course"
+                name="course"
+                type="select"
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                options={courses
+                  .filter(course => !studentEnrollments.some(e => e.course?.id === course.id))
+                  .map((course) => ({
+                    value: course.id,
+                    label: `${course.code} - ${course.name}`
+                  }))}
+                required
+              />
+              <button
+                onClick={handleAddCourseFromManageModal}
+                className="mt-3 w-full px-4 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700"
+              >
+                Add Course
+              </button>
+            </div>
 
-            {success && (
+            {success ? (
               <div className="p-3 text-sm text-emerald-600 bg-emerald-50 rounded-lg dark:bg-emerald-500/10 dark:text-emerald-400">
                 {success}
               </div>
-            )}
+            ) : error ? (
+              <div className="p-3 text-sm text-rose-600 bg-rose-50 rounded-lg dark:bg-rose-500/10 dark:text-rose-400">
+                {error}
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-end gap-3 pt-4">
               <button
                 type="button"
-                onClick={handleCloseAssignModal}
+                onClick={handleCloseManageCoursesModal}
                 className="px-4 py-2 text-sm font-medium text-slate-700 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAssignCourse}
-                className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700"
-              >
-                Assign
+                Close
               </button>
             </div>
           </div>

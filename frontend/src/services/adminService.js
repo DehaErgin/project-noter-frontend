@@ -68,6 +68,30 @@ const adminService = {
     return data;
   },
 
+  // Get students enrolled in a course
+  getCourseEnrollments: async (courseId) => {
+    try {
+      // Try course-specific endpoint first
+      const { data } = await apiClient.get(`/admin/courses/${courseId}/enrollments/`);
+      return data;
+    } catch (error) {
+      // Fallback: get all enrollments and filter by course
+      try {
+        const allEnrollments = await apiClient.get('/enrollments/');
+        const enrollments = Array.isArray(allEnrollments.data) 
+          ? allEnrollments.data 
+          : (allEnrollments.data?.enrollments || []);
+        return enrollments.filter(e => 
+          e.course_id?.toString() === courseId.toString() || 
+          e.course?.id?.toString() === courseId.toString()
+        );
+      } catch (fallbackError) {
+        console.error('Error fetching course enrollments:', fallbackError);
+        return [];
+      }
+    }
+  },
+
   // Courses
   getCourses: async () => {
     const { data } = await apiClient.get('/admin/courses/');
@@ -118,10 +142,119 @@ const adminService = {
   },
 
   assignStudentToCourse: async (studentId, courseId) => {
-    const { data } = await apiClient.post(`/admin/students/${studentId}/assign-course/`, {
-      course_id: courseId
+    console.log('[DEBUG] assignStudentToCourse called:', {
+      studentId,
+      courseId,
+      url: `/admin/students/${studentId}/assign-course/`,
+      body: { course_id: courseId }
     });
-    return data;
+    
+    try {
+      const response = await apiClient.post(`/admin/students/${studentId}/assign-course/`, {
+        course_id: courseId
+      });
+      
+      console.log('[DEBUG] assignStudentToCourse response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data,
+        headers: response.headers
+      });
+      
+      // Check if response indicates success
+      if (response.status >= 200 && response.status < 300) {
+        console.log('[DEBUG] ✅ Course assignment successful on backend');
+        // Check if response contains enrollment data
+        if (response.data) {
+          console.log('[DEBUG] Response contains data:', response.data);
+          if (response.data.enrollment || response.data.id) {
+            console.log('[DEBUG] ✅ Enrollment object found in response');
+          } else {
+            console.warn('[DEBUG] ⚠️ No enrollment object in response, but status is OK');
+          }
+        }
+      } else {
+        console.error('[DEBUG] ❌ Course assignment failed - unexpected status:', response.status);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] ❌ assignStudentToCourse error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      throw error;
+    }
+  },
+
+  getStudentEnrollments: async (studentId) => {
+    console.log('[DEBUG] getStudentEnrollments called for studentId:', studentId);
+    try {
+      // Backend endpoint: GET /api/admin/students/{studentId}/enrollments/
+      // Backend returns: Array of enrollment objects
+      // Each enrollment has: {id, student_id, course_id, course: {...}, enrollment_date, status}
+      const response = await apiClient.get(`/admin/students/${studentId}/enrollments/`);
+      console.log('[DEBUG] getStudentEnrollments response:', {
+        status: response.status,
+        data: response.data,
+        dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : (response.data?.enrollments?.length || 0)
+      });
+      
+      // Backend returns array directly
+      const data = response.data;
+      if (Array.isArray(data)) {
+        console.log('[DEBUG] ✅ Returning enrollments array with', data.length, 'items');
+        return data;
+      }
+      
+      // Fallback: if response is wrapped in object
+      const enrollments = data?.enrollments || [];
+      console.log('[DEBUG] ⚠️ Response was not array, extracted enrollments:', enrollments.length);
+      return enrollments;
+    } catch (error) {
+      console.error('[DEBUG] ❌ getStudentEnrollments error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      throw error;
+    }
+  },
+
+  removeStudentFromCourse: async (studentId, enrollmentId) => {
+    console.log('[DEBUG] removeStudentFromCourse called:', {
+      studentId,
+      enrollmentId,
+      url: `/admin/students/${studentId}/enrollments/${enrollmentId}/`
+    });
+    
+    try {
+      const response = await apiClient.delete(`/admin/students/${studentId}/enrollments/${enrollmentId}/`);
+      console.log('[DEBUG] removeStudentFromCourse response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+      
+      if (response.status >= 200 && response.status < 300) {
+        console.log('[DEBUG] ✅ Course removal successful on backend');
+      } else {
+        console.error('[DEBUG] ❌ Course removal failed - unexpected status:', response.status);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('[DEBUG] ❌ removeStudentFromCourse error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      throw error;
+    }
   },
 
   // Professors

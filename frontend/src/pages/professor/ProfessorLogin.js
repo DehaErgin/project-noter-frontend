@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import adminService from '../../services/adminService';
 import FormField from '../../components/admin/FormField';
 
-const StudentLogin = () => {
-  const [studentId, setStudentId] = useState('');
+const ProfessorLogin = () => {
+  const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -15,32 +15,28 @@ const StudentLogin = () => {
     setIsLoading(true);
 
     try {
-      // Check if student exists by trying to get the student list and find the ID
-      const students = await adminService.getStudents();
-      const student = students.find(
-        (s) => s.student_id === studentId.trim() || s.id.toString() === studentId.trim() || s.id === studentId.trim()
+      // Check if professor exists by trying to get the professor list and find the email
+      const professors = await adminService.getProfessors();
+      const professor = professors.find(
+        (p) => p.email && p.email.toLowerCase().trim() === email.toLowerCase().trim()
       );
 
-      if (student) {
-        // Student found, save to localStorage and navigate
-        const loginStudentId = student.student_id || student.id.toString();
-        localStorage.setItem('studentId', loginStudentId);
-        // Also save student info for quick access
-        localStorage.setItem('studentInfo', JSON.stringify({
-          id: student.id,
-          student_id: student.student_id || student.id.toString(),
-          name: student.name,
-          email: student.email,
-          major: student.major,
-          cohort: student.cohort,
-          advisor: student.advisor
+      if (professor) {
+        // Professor found, save to localStorage and navigate
+        const professorId = professor.id.toString();
+        localStorage.setItem('professorId', professorId);
+        // Also save professor info for quick access
+        localStorage.setItem('professorInfo', JSON.stringify({
+          id: professor.id,
+          name: professor.name,
+          email: professor.email
         }));
-        navigate(`/student/dashboard?studentId=${loginStudentId}`);
+        navigate(`/professor/courses?professorId=${professorId}`);
       } else {
-        setError('Student ID not found. Please check your student ID and try again.');
+        setError('Professor email not found. Please check your email and try again.');
       }
     } catch (err) {
-      setError(err.message || 'Failed to verify student ID. Please try again.');
+      setError(err.message || 'Failed to verify professor email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -50,20 +46,20 @@ const StudentLogin = () => {
     <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Student Login</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Professor Login</h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Enter your student ID to access your dashboard
+            Enter your email to access your grade calculator
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <FormField
-            label="Student ID"
-            name="studentId"
-            type="text"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            placeholder="Enter your student ID"
+            label="Email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email address"
             required
             error={error}
           />
@@ -76,7 +72,7 @@ const StudentLogin = () => {
 
           <button
             type="submit"
-            disabled={isLoading || !studentId.trim()}
+            disabled={isLoading || !email.trim()}
             className="w-full px-4 py-3 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Verifying...' : 'Login'}
@@ -93,5 +89,5 @@ const StudentLogin = () => {
   );
 };
 
-export default StudentLogin;
+export default ProfessorLogin;
 

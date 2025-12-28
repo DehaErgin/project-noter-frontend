@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import GradeCalculator from './components/GradeCalculator';
 import StudentLogin from './pages/student/StudentLogin';
+import ProfessorLogin from './pages/professor/ProfessorLogin';
+import ProfessorCourseSelection from './pages/professor/ProfessorCourseSelection';
 import StudentLayout from './pages/student/StudentLayout';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAssessments from './pages/student/StudentAssessments';
@@ -23,6 +25,8 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <Routes>
+          <Route path="/professor/login" element={<ProfessorLogin />} />
+          <Route path="/professor/courses" element={<ProfessorCourseSelection />} />
           <Route path="/professor" element={<GradeCalculator />} />
           <Route path="/student/login" element={<StudentLogin />} />
           <Route path="/student" element={<StudentLayout />}>

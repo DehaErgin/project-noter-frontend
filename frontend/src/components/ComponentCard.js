@@ -9,12 +9,14 @@ const ComponentCard = ({
   learningOutcomes = [],
   programOutcomes = [],
   assessments = [],
-  isStatic = false
+  isStatic = false,
+  courseStudents = []
 }) => {
   const [showGradeInput, setShowGradeInput] = useState(false);
   const [showPercentageInput, setShowPercentageInput] = useState(false);
   const [showPercentageCount, setShowPercentageCount] = useState(false);
   const [gradeValue, setGradeValue] = useState('');
+  const [selectedStudentForGrade, setSelectedStudentForGrade] = useState('');
   const [percentageCount, setPercentageCount] = useState('');
   const [percentageFieldsCount, setPercentageFieldsCount] = useState(0);
   const [percentageValues, setPercentageValues] = useState({});
@@ -96,17 +98,23 @@ const ComponentCard = ({
   };
 
   const addGrade = () => {
-    if (!gradeValue) return;
+    if (!gradeValue || !selectedStudentForGrade) return;
 
     const newGrade = parseFloat(gradeValue);
+    const studentId = selectedStudentForGrade;
+    
+    // Store grades per student: { studentId: grade }
+    const studentGrades = component.studentGrades || {};
+    studentGrades[studentId] = newGrade;
+    
     const updatedComponent = {
       ...component,
-      // enforce single grade: replace existing grade if present
-      grades: [newGrade]
+      studentGrades: studentGrades
     };
     
     onUpdate && onUpdate(updatedComponent);
     setGradeValue('');
+    setSelectedStudentForGrade('');
     setShowGradeInput(false);
   };
 
@@ -296,17 +304,31 @@ const ComponentCard = ({
           
            {showGradeInput && type !== 'learning' && (
             <div className="input-form">
+              <select
+                value={selectedStudentForGrade}
+                onChange={(e) => setSelectedStudentForGrade(e.target.value)}
+                className="grade-input"
+                style={{ marginBottom: '8px' }}
+              >
+                <option value="">-- Select Student --</option>
+                {courseStudents.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.student_id} - {student.name}
+                  </option>
+                ))}
+              </select>
               <input
                 type="number"
                 placeholder="Enter grade"
                 value={gradeValue}
                 onChange={(e) => setGradeValue(e.target.value)}
                 className="grade-input"
+                disabled={!selectedStudentForGrade}
               />
               <button 
                 className="submit-button"
                 onClick={addGrade}
-                disabled={!gradeValue}
+                disabled={!gradeValue || !selectedStudentForGrade}
               >
                 Add Grade
               </button>
@@ -314,13 +336,19 @@ const ComponentCard = ({
           )}
 
           <div className="grades-list">
-            {((component.grades || []).slice(0, 1)).map((grade, index) => (
-              <div key={index} className="grade-item">
-                <span className="grade-value">{grade}</span>
-                <div className="grade-connections">
-                  {(component.connections || [])
-                    .map((c, originalIdx) => ({ c, originalIdx }))
-                    .filter(({ c }) => c.gradeIndex === index)
+            {component.studentGrades && Object.entries(component.studentGrades).map(([studentId, grade]) => {
+              const student = courseStudents.find(s => s.id.toString() === studentId.toString());
+              return (
+                <div key={studentId} className="grade-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="grade-label" style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
+                      {student ? `${student.student_id} - ${student.name}:` : `Student ${studentId}:`}
+                    </span>
+                    <span className="grade-value">{grade}</span>
+                  </div>
+                  <div className="grade-connections">
+                    {(component.connections || [])
+                      .map((c, originalIdx) => ({ c, originalIdx }))
                     .map(({ c: connection, originalIdx }) => (
                       <div key={originalIdx} className="connection" style={{ gap: 10 }}>
                         <span className="percentage">
@@ -404,9 +432,10 @@ const ComponentCard = ({
                         )}
                       </div>
                     ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {type === 'learning' && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span className="section-label">Computed:</span>

@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useSearchParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import clsx from 'clsx';
+import studentService from '../../services/studentService';
+import useAsyncResource from '../../hooks/useAsyncResource';
 
 const navItems = [
   { to: '/student/dashboard', label: 'Dashboard' },
@@ -19,6 +21,69 @@ const StudentLayout = () => {
   const urlStudentId = searchParams.get('studentId');
   const storedStudentId = localStorage.getItem('studentId');
   const studentId = urlStudentId || storedStudentId || 'current';
+  
+  // Load student profile to display name in header
+  const profileLoader = useCallback(() => {
+    if (studentId && studentId !== 'current') {
+      return studentService.getProfile(studentId).catch(() => {
+        // Fallback to localStorage if API fails
+        try {
+          const storedInfo = localStorage.getItem('studentInfo');
+          if (storedInfo) {
+            const studentInfo = JSON.parse(storedInfo);
+            if (studentInfo.student_id === studentId || studentInfo.id.toString() === studentId.toString()) {
+              return {
+                id: studentInfo.id,
+                student_id: studentInfo.student_id,
+                name: studentInfo.name || '',
+                email: studentInfo.email || '',
+                major: studentInfo.major || '',
+                cohort: studentInfo.cohort || '',
+                advisor: studentInfo.advisor || ''
+              };
+            }
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+        return null;
+      });
+    }
+    return Promise.resolve(null);
+  }, [studentId]);
+  
+  const { data: studentProfile, refetch: refetchProfile } = useAsyncResource(profileLoader);
+
+  // Refresh profile when page becomes visible or gets focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && studentId && studentId !== 'current') {
+        refetchProfile();
+      }
+    };
+
+    const handleFocus = () => {
+      if (studentId && studentId !== 'current') {
+        refetchProfile();
+      }
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'studentInfo' && studentId && studentId !== 'current') {
+        refetchProfile();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [studentId, refetchProfile]);
   
   // If no studentId found, redirect to login
   useEffect(() => {
@@ -43,7 +108,14 @@ const StudentLayout = () => {
           <div className="flex items-center justify-between w-full max-w-6xl px-6 py-4 mx-auto">
             <div>
               <p className="text-xs font-semibold tracking-[0.3em] uppercase text-brand-500">Student</p>
-              <h1 className="text-2xl font-semibold">Learning Analytics Panel</h1>
+              <h1 className="text-2xl font-semibold">
+                {studentProfile?.name ? `${studentProfile.name}'s Learning Analytics` : 'Learning Analytics Panel'}
+              </h1>
+              {(studentProfile?.student_id || studentProfile?.id) && (
+                <p className="text-sm text-slate-500 mt-1">
+                  Student ID: {studentProfile?.student_id || studentProfile?.id}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
