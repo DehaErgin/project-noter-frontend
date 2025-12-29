@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
 import './RightPanel.css';
 import ComponentCard from './ComponentCard';
 import GradeCalculatorFlow from './GradeCalculatorFlow';
@@ -11,34 +10,31 @@ const RightPanel = ({
   setAssessmentComponents,
   setLearningOutcomeComponents,
   onUpdateAssessment,
-  onUpdateLearningOutcome
+  onUpdateLearningOutcome,
+  courseStudents
 }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  // Determine view mode from URL
-  const viewMode = location.pathname === '/flow-view' ? 'flow' : 'cards';
-  
-  // Initialize URL on first render if not set
-  useEffect(() => {
-    if (location.pathname === '/') {
-      navigate('/card-view', { replace: true });
-    }
-  }, [location.pathname, navigate]);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'flow'
 
   const handleDeleteConnection = (sourceComponentId, targetComponentId, percentageIndex, connectionType) => {
+    // ... (logic remains the same, assuming flow view handles its own complex updates properly or will be updated later)
+    // For now, let's keep setAssessmentComponents as is for flow, but Cards should use persistence.
     if (connectionType === 'learning') {
       setAssessmentComponents(prev =>
         prev.map(comp => {
+          // ... (keep existing logic)
           if (comp.id === sourceComponentId) {
-            return {
+            const updated = {
               ...comp,
               connections: (comp.connections || []).filter(
-                conn => !(conn.type === 'learning' && 
-                          conn.targetId === targetComponentId && 
-                          conn.percentageIndex === percentageIndex)
+                conn => !(conn.type === 'learning' &&
+                  conn.targetId === targetComponentId &&
+                  conn.percentageIndex === percentageIndex)
               )
             };
+            // Side effect: update persistence if possible?
+            // For now, just state update. Flow view seems to be complex.
+            onUpdateAssessment && onUpdateAssessment(updated);
+            return updated;
           }
           return comp;
         })
@@ -47,14 +43,16 @@ const RightPanel = ({
       setLearningOutcomeComponents(prev =>
         prev.map(comp => {
           if (comp.id === sourceComponentId) {
-            return {
+            const updated = {
               ...comp,
               connections: (comp.connections || []).filter(
-                conn => !(conn.type === 'program' && 
-                          conn.targetId === targetComponentId && 
-                          conn.percentageIndex === percentageIndex)
+                conn => !(conn.type === 'program' &&
+                  conn.targetId === targetComponentId &&
+                  conn.percentageIndex === percentageIndex)
               )
             };
+            onUpdateLearningOutcome && onUpdateLearningOutcome(updated);
+            return updated;
           }
           return comp;
         })
@@ -65,15 +63,16 @@ const RightPanel = ({
   return (
     <div className="right-panel">
       <div className="view-mode-toggle">
+        {/* ... */}
         <button
           className={`toggle-button ${viewMode === 'cards' ? 'active' : ''}`}
-          onClick={() => navigate('/card-view')}
+          onClick={() => setViewMode('cards')}
         >
           📋 Card View
         </button>
         <button
           className={`toggle-button ${viewMode === 'flow' ? 'active' : ''}`}
-          onClick={() => navigate('/flow-view')}
+          onClick={() => setViewMode('flow')}
         >
           🌊 Flow View
         </button>
@@ -105,7 +104,7 @@ const RightPanel = ({
       ) : (
         <div className="panel-content">
           {/* Assessment Components Cards */}
-          {assessmentComponents.length > 0 ? (
+          {assessmentComponents.length > 0 && (
             <div className="cards-section">
               <h3 className="section-title">Assessment Components</h3>
               <div className="cards-grid">
@@ -123,16 +122,57 @@ const RightPanel = ({
                     })}
                     learningOutcomes={learningOutcomeComponents}
                     programOutcomes={programOutcomeComponents}
+                    courseStudents={courseStudents}
                   />
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="empty-state">
-              <p>No assessment components yet. Add one from the left panel.</p>
+          )}
+
+          {/* Learning Outcome Components Cards */}
+          {learningOutcomeComponents.length > 0 && (
+            <div className="cards-section">
+              <h3 className="section-title">Learning Outcome Components</h3>
+              <div className="cards-grid">
+                {learningOutcomeComponents.map((component) => (
+                  <ComponentCard
+                    key={component.id}
+                    component={component}
+                    type="learning"
+                    assessments={assessmentComponents}
+                    onUpdate={onUpdateLearningOutcome || ((updatedComponent) => {
+                      setLearningOutcomeComponents(prev =>
+                        prev.map(comp =>
+                          comp.id === component.id ? updatedComponent : comp
+                        )
+                      );
+                    })}
+                    programOutcomes={programOutcomeComponents}
+                    courseStudents={courseStudents}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
+          {/* Program Outcome Components Cards */}
+          {programOutcomeComponents.length > 0 && (
+            <div className="cards-section">
+              <h3 className="section-title">Program Outcome Components</h3>
+              <div className="cards-grid">
+                {programOutcomeComponents.map((component) => (
+                  <ComponentCard
+                    key={component.id}
+                    component={component}
+                    type="program"
+                    isStatic={true}
+                    learningOutcomes={learningOutcomeComponents}
+                    assessments={assessmentComponents}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

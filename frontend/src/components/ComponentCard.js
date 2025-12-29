@@ -9,8 +9,10 @@ const ComponentCard = ({
   learningOutcomes = [],
   programOutcomes = [],
   assessments = [],
-  isStatic = false
+  isStatic = false,
+  courseStudents = []
 }) => {
+<<<<<<< HEAD
   const [gradeValue, setGradeValue] = useState(() => {
     if (type !== 'assessment') return '';
     const initial = (component.grades || [])[0];
@@ -28,6 +30,20 @@ const ComponentCard = ({
   useEffect(() => {
     setNameValue(component.name || '');
   }, [component.name]);
+=======
+  const [showGradeInput, setShowGradeInput] = useState(false);
+  const [showPercentageInput, setShowPercentageInput] = useState(false);
+  const [showPercentageCount, setShowPercentageCount] = useState(false);
+  const [gradeValue, setGradeValue] = useState('');
+  const [selectedStudentForGrade, setSelectedStudentForGrade] = useState('');
+  const [percentageCount, setPercentageCount] = useState('');
+  const [percentageFieldsCount, setPercentageFieldsCount] = useState(0);
+  const [percentageValues, setPercentageValues] = useState({});
+  const [editingPercentageIndex, setEditingPercentageIndex] = useState(null);
+  const [editingPercentageValue, setEditingPercentageValue] = useState('');
+  const [editingConnectionIndex, setEditingConnectionIndex] = useState(null);
+  const [editingConnectionTargetId, setEditingConnectionTargetId] = useState('');
+>>>>>>> super-user
 
   // Calculate total grade based on connections
   const calculateTotalGrade = () => {
@@ -101,6 +117,7 @@ const ComponentCard = ({
     return 0;
   };
 
+<<<<<<< HEAD
   const persistAssessmentGrade = () => {
     if (type !== 'assessment' || !onUpdate) return;
     const trimmed = (gradeValue ?? '').toString().trim();
@@ -116,6 +133,27 @@ const ComponentCard = ({
     }
     const updatedComponent = { ...component, grades: [parsed] };
     onUpdate(updatedComponent);
+=======
+  const addGrade = () => {
+    if (!gradeValue || !selectedStudentForGrade) return;
+
+    const newGrade = parseFloat(gradeValue);
+    const studentId = selectedStudentForGrade;
+    
+    // Store grades per student: { studentId: grade }
+    const studentGrades = component.studentGrades || {};
+    studentGrades[studentId] = newGrade;
+    
+    const updatedComponent = {
+      ...component,
+      studentGrades: studentGrades
+    };
+    
+    onUpdate && onUpdate(updatedComponent);
+    setGradeValue('');
+    setSelectedStudentForGrade('');
+    setShowGradeInput(false);
+>>>>>>> super-user
   };
 
   const approveLearningOutcomeGrade = () => {
@@ -202,6 +240,7 @@ const ComponentCard = ({
           <div className="section-header">
             <span className="section-label">Grade</span>
           </div>
+<<<<<<< HEAD
           {type === 'assessment' && !isStatic ? (
             <input
               type="number"
@@ -251,6 +290,147 @@ const ComponentCard = ({
               <span className="section-label">Computed:</span>
               <span className="grade-value">{calculateTotalGrade()}</span>
               {!isStatic && (
+=======
+          
+           {showGradeInput && type !== 'learning' && (
+            <div className="input-form">
+              <select
+                value={selectedStudentForGrade}
+                onChange={(e) => setSelectedStudentForGrade(e.target.value)}
+                className="grade-input"
+                style={{ marginBottom: '8px' }}
+              >
+                <option value="">-- Select Student --</option>
+                {courseStudents.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.student_id} - {student.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                placeholder="Enter grade"
+                value={gradeValue}
+                onChange={(e) => setGradeValue(e.target.value)}
+                className="grade-input"
+                disabled={!selectedStudentForGrade}
+              />
+              <button 
+                className="submit-button"
+                onClick={addGrade}
+                disabled={!gradeValue || !selectedStudentForGrade}
+              >
+                Add Grade
+              </button>
+            </div>
+          )}
+
+          <div className="grades-list">
+            {component.studentGrades && Object.entries(component.studentGrades).map(([studentId, grade]) => {
+              const student = courseStudents.find(s => s.id.toString() === studentId.toString());
+              return (
+                <div key={studentId} className="grade-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span className="grade-label" style={{ fontSize: '12px', color: '#64748b', fontWeight: '500' }}>
+                      {student ? `${student.student_id} - ${student.name}:` : `Student ${studentId}:`}
+                    </span>
+                    <span className="grade-value">{grade}</span>
+                  </div>
+                  <div className="grade-connections">
+                    {(component.connections || [])
+                      .map((c, originalIdx) => ({ c, originalIdx }))
+                    .map(({ c: connection, originalIdx }) => (
+                      <div key={originalIdx} className="connection" style={{ gap: 10 }}>
+                        <span className="percentage">
+                          {(component.percentages || [])[connection.percentageIndex]}%
+                        </span>
+                        <span className="arrow">→</span>
+                        {editingConnectionIndex === originalIdx ? (
+                          <>
+                            {type === 'assessment' ? (
+                              <select
+                                className="percentage-input"
+                                style={{ width: 180, marginBottom: 0 }}
+                                value={editingConnectionTargetId}
+                                onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                              >
+                                {learningOutcomes.map(lo => (
+                                  <option key={lo.id} value={lo.id}>{lo.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <select
+                                className="percentage-input"
+                                style={{ width: 180, marginBottom: 0 }}
+                                value={editingConnectionTargetId}
+                                onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                              >
+                                {programOutcomes.map(po => (
+                                  <option key={po.id} value={po.id}>{po.name}</option>
+                                ))}
+                              </select>
+                            )}
+                            <button
+                              className="small-icon-button save"
+                              onClick={() => {
+                                const updated = [...(component.connections || [])];
+                                const newTargetId = isNaN(parseInt(editingConnectionTargetId))
+                                  ? editingConnectionTargetId
+                                  : parseInt(editingConnectionTargetId);
+                                updated[originalIdx] = {
+                                  ...updated[originalIdx],
+                                  targetId: newTargetId
+                                };
+                                const updatedComponent = { ...component, connections: updated };
+                                onUpdate && onUpdate(updatedComponent);
+                                setEditingConnectionIndex(null);
+                                setEditingConnectionTargetId('');
+                              }}
+                            >Save</button>
+                            <button
+                              className="small-icon-button cancel"
+                              onClick={() => {
+                                setEditingConnectionIndex(null);
+                                setEditingConnectionTargetId('');
+                              }}
+                            >Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="target">
+                              {connection.type === 'learning' 
+                                ? learningOutcomes.find(lo => lo.id === connection.targetId)?.name
+                                : programOutcomes.find(po => po.id === connection.targetId)?.name
+                              }
+                            </span>
+                            <button
+                              className="small-icon-button edit"
+                              onClick={() => {
+                                setEditingConnectionIndex(originalIdx);
+                                setEditingConnectionTargetId(String(connection.targetId));
+                              }}
+                            >Edit</button>
+                            <button
+                              className="small-icon-button delete"
+                              onClick={() => {
+                                const updated = (component.connections || []).filter((_, i) => i !== originalIdx);
+                                const updatedComponent = { ...component, connections: updated };
+                                onUpdate && onUpdate(updatedComponent);
+                              }}
+                            >Delete</button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {type === 'learning' && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="section-label">Computed:</span>
+                <span className="grade-value">{calculateTotalGrade()}</span>
+>>>>>>> super-user
                 <button className="small-icon-button save" onClick={approveLearningOutcomeGrade}>Approve</button>
               )}
             </div>

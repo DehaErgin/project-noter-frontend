@@ -1,6 +1,10 @@
 {
   "short_name": "Grade Calculator",
+<<<<<<< HEAD
   "name": "Grade Calculator System",
+=======
+  "name": "Grade Calculator Frontend",
+>>>>>>> super-user
   "icons": [
     {
       "src": "favicon.ico",

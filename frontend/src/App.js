@@ -2,19 +2,44 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import GradeCalculator from './components/GradeCalculator';
+import UnifiedLogin from './pages/UnifiedLogin';
+import ProfessorLogin from './pages/professor/ProfessorLogin'; // Keeping for reference or safety
+import StudentLogin from './pages/student/StudentLogin'; // Keeping for reference or safety
+
+import ProfessorCourseSelection from './pages/professor/ProfessorCourseSelection';
 import StudentLayout from './pages/student/StudentLayout';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentAssessments from './pages/student/StudentAssessments';
 import StudentLearningOutcomes from './pages/student/StudentLearningOutcomes';
 import StudentProgramOutcomes from './pages/student/StudentProgramOutcomes';
 import StudentProfile from './pages/student/StudentProfile';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import ProgramOutcomes from './pages/admin/ProgramOutcomes';
+import LearningOutcomes from './pages/admin/LearningOutcomes';
+import Courses from './pages/admin/Courses';
+import Users from './pages/admin/Users';
+import StudentOptions from './pages/admin/StudentOptions';
+import Approvals from './pages/admin/Approvals';
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
         <Routes>
+          {/* Unified Login Routes */}
+          <Route path="/login" element={<UnifiedLogin />} />
+          <Route path="/professor/login" element={<Navigate to="/login?type=professor" replace />} />
+          <Route path="/student/login" element={<Navigate to="/login?type=student" replace />} />
+          <Route path="/admin/login" element={<Navigate to="/login?type=admin" replace />} />
+
+
+          <Route path="/professor/:professorId/courses" element={<ProfessorCourseSelection />} />
+          <Route path="/professor/:professorId/courses/:courseId" element={<GradeCalculator />} />
+          {/* Legacy routes with query params - redirect to new format */}
+          <Route path="/professor/courses" element={<ProfessorCourseSelection />} />
           <Route path="/professor" element={<GradeCalculator />} />
+
           <Route path="/student" element={<StudentLayout />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
@@ -23,7 +48,17 @@ function App() {
             <Route path="program-outcomes" element={<StudentProgramOutcomes />} />
             <Route path="profile" element={<StudentProfile />} />
           </Route>
-          <Route path="*" element={<Navigate to="/student/dashboard" replace />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="program-outcomes" element={<ProgramOutcomes />} />
+            <Route path="learning-outcomes" element={<LearningOutcomes />} />
+            <Route path="courses" element={<Courses />} />
+            <Route path="users" element={<Users />} />
+            <Route path="student-options" element={<StudentOptions />} />
+            <Route path="approvals" element={<Approvals />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </div>
