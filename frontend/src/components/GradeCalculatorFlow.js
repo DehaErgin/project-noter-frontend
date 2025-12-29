@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -42,11 +42,6 @@ const nodeTypes = {
       <div className="node-grade">
         Grade: <strong>{data.grade || 'N/A'}</strong>
       </div>
-      {data.computedGrade && (
-        <div className="node-computed">
-          Computed: <strong>{data.computedGrade}</strong>
-        </div>
-      )}
       {data.detail && (
         <div className="node-detail" title={data.detail}>
           📋 {data.detail.substring(0, 30)}...
@@ -61,11 +56,9 @@ const nodeTypes = {
         <span className="node-type-badge">Program Outcome</span>
       </div>
       <div className="node-title">{data.label}</div>
-      {data.computedGrade && (
-        <div className="node-computed">
-          Computed: <strong>{data.computedGrade}</strong>
-        </div>
-      )}
+      <div className="node-grade">
+        Grade: <strong>{data.grade || 'N/A'}</strong>
+      </div>
       {data.detail && (
         <div className="node-detail" title={data.detail}>
           📋 {data.detail.substring(0, 30)}...
@@ -89,6 +82,9 @@ const GradeCalculatorFlow = ({
   const [connectionModal, setConnectionModal] = useState(null);
   const [selectedPercentage, setSelectedPercentage] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState(null);
+  const reactFlowInstance = useRef(null);
+  const hasFittedView = useRef(false);
   // Calculate computed grades for learning outcomes
   const calculateLearningOutcomeGrade = (lo) => {
     let totalWeightedGrade = 0;
@@ -111,7 +107,6 @@ const GradeCalculatorFlow = ({
   // Calculate computed grades for program outcomes
   const calculateProgramOutcomeGrade = (po) => {
     let totalWeightedGrade = 0;
-    let totalWeight = 0;
 
     const loIdToProgramWeights = new Map();
     learningOutcomeComponents.forEach(lo => {
@@ -135,13 +130,59 @@ const GradeCalculatorFlow = ({
           const aWeight = isNaN(aPct) ? 0 : aPct / 100;
           const combined = aWeight * loWeight;
           totalWeightedGrade += aGrade * combined;
-          totalWeight += combined;
         });
     });
 
-    // Normalize by total weight to get a grade out of 100
-    return totalWeight > 0 ? (totalWeightedGrade / totalWeight).toFixed(1) : '0.0';
+    return totalWeightedGrade.toFixed(1);
   };
+
+  // Calculate bounds for both panning and node dragging - same limits for both
+  const bounds = useMemo(() => {
+    const nodeWidth = 200;
+    const nodeHeight = 120;
+    const nodeSpacing = 150;
+    const startY = 100;
+    
+    // Find max node count
+    const maxCount = Math.max(
+      assessmentComponents.length,
+      learningOutcomeComponents.length,
+      programOutcomeComponents.length,
+      1
+    );
+    
+    // Calculate content area
+    const contentMinX = 50;
+    const contentMaxX = 750 + nodeWidth;
+    const contentMinY = startY;
+    const contentMaxY = startY + (maxCount - 1) * nodeSpacing + nodeHeight;
+    
+    // Add reasonable padding (2x content size) - same for both panning and node dragging
+    const paddingMultiplier = 2;
+    const contentWidth = contentMaxX - contentMinX;
+    const contentHeight = contentMaxY - contentMinY;
+    
+    const paddingX = contentWidth * paddingMultiplier;
+    const paddingY = contentHeight * paddingMultiplier;
+    
+    const minX = contentMinX - paddingX;
+    const maxX = contentMaxX + paddingX;
+    const minY = contentMinY - paddingY;
+    const maxY = contentMaxY + paddingY;
+    
+    return {
+      panBounds: {
+        minX,
+        maxX,
+        minY,
+        maxY
+      },
+      nodeExtent: [
+        [minX, minY],
+        [maxX, maxY]
+      ]
+    };
+  }, [assessmentComponents.length, learningOutcomeComponents.length, programOutcomeComponents.length]);
 
   // Create nodes from components
   const initialNodes = useMemo(() => {
@@ -196,7 +237,8 @@ const GradeCalculatorFlow = ({
         position: { x: 750, y: yOffset + index * nodeSpacing },
         data: {
           label: comp.name,
-          computedGrade: computedGrade,
+          grade: (comp.grades || [])[0] || computedGrade,
+          computedGrade,
           detail: comp.detail,
           componentId: comp.id,
           type: 'program'
@@ -283,9 +325,26 @@ const GradeCalculatorFlow = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Update nodes when components change
+  // Update nodes when components change, but preserve existing positions
   React.useEffect(() => {
-    setNodes(initialNodes);
+    setNodes((currentNodes) => {
+      // Create a map of existing node positions
+      const positionMap = new Map();
+      currentNodes.forEach(node => {
+        positionMap.set(node.id, { x: node.position.x, y: node.position.y });
+      });
+
+      // Merge initial nodes with preserved positions
+      return initialNodes.map(newNode => {
+        const existingPosition = positionMap.get(newNode.id);
+        if (existingPosition) {
+          // Preserve existing position
+          return { ...newNode, position: existingPosition };
+        }
+        // Use initial position for new nodes
+        return newNode;
+      });
+    });
   }, [initialNodes, setNodes]);
 
   // Update edges when connections change
@@ -328,18 +387,25 @@ const GradeCalculatorFlow = ({
   }, [nodes, learningOutcomeComponents, programOutcomeComponents]);
 
   const onEdgeClick = useCallback((event, edge) => {
-    // Allow deleting edges by clicking
-    if (window.confirm('Bu bağlantıyı silmek istediğinizden emin misiniz?')) {
-      if (onDeleteConnection && edge.data) {
-        const { sourceComponentId, targetComponentId, percentageIndex, connectionType } = edge.data;
-        onDeleteConnection(sourceComponentId, targetComponentId, percentageIndex, connectionType);
-      }
-      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    // Show confirmation modal for deleting edges
+    if (edge.data) {
+      setDeleteConfirmModal(edge);
     }
-  }, [onDeleteConnection, setEdges]);
+  }, []);
 
-  const handleAddConnection = () => {
-    if (!connectionModal || !selectedPercentage) return;
+  const handleConfirmDelete = useCallback(() => {
+    if (!deleteConfirmModal) return;
+    
+    if (onDeleteConnection && deleteConfirmModal.data) {
+      const { sourceComponentId, targetComponentId, percentageIndex, connectionType } = deleteConfirmModal.data;
+      onDeleteConnection(sourceComponentId, targetComponentId, percentageIndex, connectionType);
+    }
+    setEdges((eds) => eds.filter((e) => e.id !== deleteConfirmModal.id));
+    setDeleteConfirmModal(null);
+  }, [deleteConfirmModal, onDeleteConnection, setEdges]);
+
+  const handleAddConnection = useCallback(() => {
+    if (!connectionModal || selectedPercentage === '') return;
 
     const { sourceNode, targetNode } = connectionModal;
     
@@ -347,56 +413,24 @@ const GradeCalculatorFlow = ({
     const targetId = targetNode ? targetNode.data.componentId : (selectedTarget ? parseInt(selectedTarget) : null);
     if (!targetId) return;
     
+    const parsedPercentage = parseFloat(selectedPercentage);
+    if (Number.isNaN(parsedPercentage)) return;
+
+    const clampedPercentage = Math.max(0, Math.min(100, parsedPercentage));
+
     if (sourceNode.data.type === 'assessment') {
       const assessment = assessmentComponents.find(c => c.id === sourceNode.data.componentId);
       if (!assessment) return;
 
-      let percentageIndex;
-      const percentageNum = parseFloat(selectedPercentage);
-      
-      // Check if selectedPercentage is a valid index (when selecting from dropdown)
-      // or a new percentage value (when entering manually)
       const existingPercentages = assessment.percentages || [];
-      
-      if (!isNaN(percentageNum) && percentageNum >= 0 && percentageNum <= 100) {
-        // It's a percentage value (new or existing)
-        const existingIndex = existingPercentages.findIndex(p => p === percentageNum);
-        if (existingIndex >= 0) {
-          percentageIndex = existingIndex;
-        } else {
-          // Add new percentage and connection in one update
-          percentageIndex = existingPercentages.length;
-          const updatedAssessment = {
-            ...assessment,
-            percentages: [...existingPercentages, percentageNum],
-            connections: [
-              ...(assessment.connections || []),
-              {
-                type: 'learning',
-                gradeIndex: 0,
-                percentageIndex: percentageIndex,
-                targetId: targetId
-              }
-            ]
-          };
-          setAssessmentComponents(prev =>
-            prev.map(comp => comp.id === assessment.id ? updatedAssessment : comp)
-          );
-          setConnectionModal(null);
-          setSelectedPercentage('');
-          setSelectedTarget('');
-          return;
-        }
-      } else {
-        // It's an index string from dropdown
-        percentageIndex = parseInt(selectedPercentage);
-        if (isNaN(percentageIndex) || percentageIndex < 0 || percentageIndex >= existingPercentages.length) {
-          return;
-        }
-      }
+      const existingIndex = existingPercentages.findIndex(p => p === clampedPercentage);
+      const percentageIndex = existingIndex >= 0 ? existingIndex : existingPercentages.length;
 
       const updatedAssessment = {
         ...assessment,
+        percentages: existingIndex >= 0
+          ? existingPercentages
+          : [...existingPercentages, clampedPercentage],
         connections: [
           ...(assessment.connections || []),
           {
@@ -407,6 +441,7 @@ const GradeCalculatorFlow = ({
           }
         ]
       };
+
       setAssessmentComponents(prev =>
         prev.map(comp => comp.id === assessment.id ? updatedAssessment : comp)
       );
@@ -414,47 +449,15 @@ const GradeCalculatorFlow = ({
       const lo = learningOutcomeComponents.find(c => c.id === sourceNode.data.componentId);
       if (!lo) return;
 
-      let percentageIndex;
-      const percentageNum = parseFloat(selectedPercentage);
       const existingPercentages = lo.percentages || [];
-      
-      if (!isNaN(percentageNum) && percentageNum >= 0 && percentageNum <= 100) {
-        const existingIndex = existingPercentages.findIndex(p => p === percentageNum);
-        if (existingIndex >= 0) {
-          percentageIndex = existingIndex;
-        } else {
-          // Add new percentage and connection in one update
-          percentageIndex = existingPercentages.length;
-          const updatedLO = {
-            ...lo,
-            percentages: [...existingPercentages, percentageNum],
-            connections: [
-              ...(lo.connections || []),
-              {
-                type: 'program',
-                gradeIndex: 0,
-                percentageIndex: percentageIndex,
-                targetId: targetId
-              }
-            ]
-          };
-          setLearningOutcomeComponents(prev =>
-            prev.map(comp => comp.id === lo.id ? updatedLO : comp)
-          );
-          setConnectionModal(null);
-          setSelectedPercentage('');
-          setSelectedTarget('');
-          return;
-        }
-      } else {
-        percentageIndex = parseInt(selectedPercentage);
-        if (isNaN(percentageIndex) || percentageIndex < 0 || percentageIndex >= existingPercentages.length) {
-          return;
-        }
-      }
+      const existingIndex = existingPercentages.findIndex(p => p === clampedPercentage);
+      const percentageIndex = existingIndex >= 0 ? existingIndex : existingPercentages.length;
 
       const updatedLO = {
         ...lo,
+        percentages: existingIndex >= 0
+          ? existingPercentages
+          : [...existingPercentages, clampedPercentage],
         connections: [
           ...(lo.connections || []),
           {
@@ -473,7 +476,32 @@ const GradeCalculatorFlow = ({
     setConnectionModal(null);
     setSelectedPercentage('');
     setSelectedTarget('');
-  };
+  }, [connectionModal, selectedPercentage, selectedTarget, assessmentComponents, learningOutcomeComponents, setAssessmentComponents, setLearningOutcomeComponents]);
+
+  // Handle keyboard shortcuts for connection modal
+  useEffect(() => {
+    if (!connectionModal) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        // Only trigger if form is valid
+        if (selectedPercentage && (connectionModal.targetNode || selectedTarget)) {
+          handleAddConnection();
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        setConnectionModal(null);
+        setSelectedPercentage('');
+        setSelectedTarget('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [connectionModal, selectedPercentage, selectedTarget, handleAddConnection]);
 
   const onNodeClick = useCallback((event, node) => {
     // Only allow connections from assessment to learning, and learning to program
@@ -504,7 +532,19 @@ const GradeCalculatorFlow = ({
           onEdgeClick={onEdgeClick}
           onNodeClick={onNodeClick}
           nodeTypes={nodeTypes}
-          fitView
+          connectionRadius={180}
+          onInit={(instance) => {
+            reactFlowInstance.current = instance;
+            // Only fit view on first initialization
+            if (!hasFittedView.current) {
+              instance.fitView({ padding: 0.2, duration: 0 });
+              hasFittedView.current = true;
+            }
+          }}
+          minZoom={0.1}
+          maxZoom={2}
+          translateExtent={[[bounds.panBounds.minX, bounds.panBounds.minY], [bounds.panBounds.maxX, bounds.panBounds.maxY]]}
+          nodeExtent={bounds.nodeExtent}
         >
           <Background />
           <Controls />
@@ -522,69 +562,29 @@ const GradeCalculatorFlow = ({
             <div className="modal-content">
               <div className="form-group">
                 <label>Percentage (%):</label>
-                {(() => {
-                  const sourceComponent = connectionModal.sourceNode.data.type === 'assessment'
-                    ? assessmentComponents.find(c => c.id === connectionModal.sourceNode.data.componentId)
-                    : learningOutcomeComponents.find(c => c.id === connectionModal.sourceNode.data.componentId);
-                  const existingPercentages = (sourceComponent?.percentages || []);
-                  
-                  if (existingPercentages.length > 0) {
-                    return (
-                      <select
-                        value={selectedPercentage}
-                        onChange={(e) => setSelectedPercentage(e.target.value)}
-                      >
-                        <option value="">Select or enter new percentage...</option>
-                        {existingPercentages.map((pct, idx) => (
-                          <option key={idx} value={idx}>
-                            Use existing: {pct}%
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  }
-                  return (
-                    <input
-                      type="number"
-                      value={selectedPercentage}
-                      onChange={(e) => setSelectedPercentage(e.target.value)}
-                      placeholder="Enter percentage"
-                      min="0"
-                      max="100"
-                    />
-                  );
-                })()}
-                {(() => {
-                  const sourceComponent = connectionModal.sourceNode.data.type === 'assessment'
-                    ? assessmentComponents.find(c => c.id === connectionModal.sourceNode.data.componentId)
-                    : learningOutcomeComponents.find(c => c.id === connectionModal.sourceNode.data.componentId);
-                  const existingPercentages = (sourceComponent?.percentages || []);
-                  const isIndex = existingPercentages.length > 0 && selectedPercentage && !isNaN(parseInt(selectedPercentage)) && parseInt(selectedPercentage) >= 0 && parseInt(selectedPercentage) < existingPercentages.length;
-                  
-                  if (existingPercentages.length > 0 && !isIndex) {
-                    return (
-                      <div style={{ marginTop: '8px' }}>
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>Or enter new percentage value: </span>
-                        <input
-                          type="number"
-                          value={isIndex ? '' : selectedPercentage}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            // Only set if it's a number (not an index)
-                            if (!val || (!isNaN(parseFloat(val)) && parseFloat(val) >= 0 && parseFloat(val) <= 100)) {
-                              setSelectedPercentage(val);
-                            }
-                          }}
-                          placeholder="New percentage"
-                          min="0"
-                          max="100"
-                          style={{ width: '150px', marginLeft: '8px' }}
-                        />
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                <input
+                  type="number"
+                  value={selectedPercentage}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) {
+                      setSelectedPercentage('');
+                      return;
+                    }
+                    const num = parseFloat(val);
+                    if (Number.isNaN(num)) return;
+                    if (num < 0) {
+                      setSelectedPercentage('0');
+                    } else if (num > 100) {
+                      setSelectedPercentage('100');
+                    } else {
+                      setSelectedPercentage(val);
+                    }
+                  }}
+                  placeholder="Enter percentage"
+                  min="0"
+                  max="100"
+                />
               </div>
               <div className="form-group">
                 <label>Target:</label>
@@ -621,6 +621,37 @@ const GradeCalculatorFlow = ({
                     setSelectedPercentage('');
                     setSelectedTarget('');
                   }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmModal && (
+        <div className="connection-modal-overlay" onClick={() => setDeleteConfirmModal(null)}>
+          <div className="connection-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Connection</h3>
+              <button className="close-button" onClick={() => setDeleteConfirmModal(null)}>×</button>
+            </div>
+            <div className="modal-content">
+              <p style={{ marginBottom: '20px', color: '#374151' }}>
+              Are you sure you want to delete this link?
+              </p>
+              <div className="modal-actions">
+                <button
+                  className="submit-button"
+                  onClick={handleConfirmDelete}
+                  style={{ backgroundColor: '#ef4444' }}
+                >
+                  Delete
+                </button>
+                <button
+                  className="cancel-button"
+                  onClick={() => setDeleteConfirmModal(null)}
                 >
                   Cancel
                 </button>

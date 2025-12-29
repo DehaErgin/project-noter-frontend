@@ -27,6 +27,9 @@
   padding: 20px 20px 16px;
   border-bottom: 1px solid #f1f5f9;
   background-color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .card-title {
@@ -34,6 +37,37 @@
   font-weight: 600;
   color: #1e293b;
   margin: 0 0 8px 0;
+}
+
+.card-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-edit {
+  flex: 1;
+}
+
+.name-edit-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  font-family: 'Inter', sans-serif;
+}
+
+.name-edit-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.name-edit-button {
+  padding: 6px 10px;
 }
 
 .detail-info {
@@ -56,6 +90,23 @@
   margin-bottom: 24px;
 }
 
+.grade-display {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.computed-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -74,8 +125,8 @@
   color: white;
   border: none;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -256,24 +307,3 @@
   color: #64748b;
 }
 
-.total-grade {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background-color: #f0fdf4;
-  border-radius: 8px;
-  border: 1px solid #bbf7d0;
-  margin-top: 16px;
-}
-
-.total-label {
-  font-weight: 600;
-  color: #166534;
-}
-
-.total-value {
-  font-weight: 700;
-  font-size: 18px;
-  color: #15803d;
-}

@@ -94,3 +94,13 @@ src/
 ## License
 
 This project is created for educational purposes.
+
+## API Configuration
+
+- The frontend calls a Django backend via REST endpoints.
+- Default base URL is `http://localhost:8000/api`. You can override it by setting an environment variable:
+  - Create a `.env` file in the `frontend/` directory with:
+    ```
+    REACT_APP_API_URL=http://127.0.0.1:8000/api
+    ```
+  - Restart the dev server after changing environment variables.

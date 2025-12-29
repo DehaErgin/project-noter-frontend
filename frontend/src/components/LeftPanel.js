@@ -15,7 +15,9 @@ const LeftPanel = ({
   onAddAssessment,
   onAddLearningOutcome,
   onRemoveAssessment,
-  onRemoveLearningOutcome
+  onRemoveLearningOutcome,
+  onRenameAssessment,
+  onRenameLearningOutcome
 }) => {
   return (
     <div className="left-panel">
@@ -28,6 +30,7 @@ const LeftPanel = ({
           setIsCollapsed={setIsAssessmentCollapsed}
           onAddItem={onAddAssessment}
           onRemoveItem={onRemoveAssessment}
+          onRenameItem={onRenameAssessment}
           addButtonText="Enter assessment component name"
           placeholder="Assessment component name"
           showDetail={false}
@@ -41,6 +44,7 @@ const LeftPanel = ({
           setIsCollapsed={setIsLearningOutcomeCollapsed}
           onAddItem={onAddLearningOutcome}
           onRemoveItem={onRemoveLearningOutcome}
+          onRenameItem={onRenameLearningOutcome}
           addButtonText="Enter learning outcome name"
           placeholder="Learning outcome name"
           showDetail={true}

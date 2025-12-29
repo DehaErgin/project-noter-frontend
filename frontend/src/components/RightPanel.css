@@ -53,6 +53,16 @@
   margin-bottom: 32px;
 }
 
+.empty-state {
+  padding: 40px;
+  background-color: #f8fafc;
+  border: 2px dashed #cbd5f5;
+  border-radius: 12px;
+  color: #64748b;
+  text-align: center;
+  font-size: 15px;
+}
+
 .section-title {
   font-size: 18px;
   font-weight: 600;
