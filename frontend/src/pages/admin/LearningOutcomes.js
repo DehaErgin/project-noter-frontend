@@ -10,6 +10,7 @@ import FormField from '../../components/admin/FormField';
 
 const LearningOutcomes = () => {
   const { adminId } = useOutletContext();
+  const [selectedCourseId, setSelectedCourseId] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [editingLO, setEditingLO] = useState(null);
@@ -20,7 +21,16 @@ const LearningOutcomes = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  const loader = useCallback(() => adminService.getLearningOutcomes(), []);
+  // Load courses
+  const coursesLoader = useCallback(() => adminService.getCourses(), []);
+  const { data: coursesData, isLoading: coursesLoading, refetch: refetchCourses } = useAsyncResource(coursesLoader);
+  const courses = coursesData || [];
+
+  // Load learning outcomes for selected course
+  const loader = useCallback(() => {
+    if (!selectedCourseId) return Promise.resolve([]);
+    return adminService.getLearningOutcomes(selectedCourseId);
+  }, [selectedCourseId]);
   const { data, isLoading, error: fetchError, refetch } = useAsyncResource(loader);
 
   const poLoader = useCallback(() => adminService.getProgramOutcomes(), []);
@@ -75,6 +85,10 @@ const LearningOutcomes = () => {
   };
 
   const handleOpenModal = (lo = null) => {
+    if (!lo && !selectedCourseId) {
+      setError('Please select a course first');
+      return;
+    }
     setEditingLO(lo);
     setError(null);
     setSuccess(null);
@@ -109,12 +123,18 @@ const LearningOutcomes = () => {
     setError(null);
     setSuccess(null);
 
+    if (!selectedCourseId) {
+      setError('Please select a course first');
+      return;
+    }
+
     try {
       if (editingLO) {
         await adminService.updateLearningOutcome(editingLO.id, formData);
         setSuccess('Learning Outcome updated successfully!');
       } else {
-        await adminService.createLearningOutcome(formData);
+        // Create LO for the selected course
+        await adminService.createLearningOutcome(formData, parseInt(selectedCourseId));
         setSuccess('Learning Outcome created successfully!');
       }
       setTimeout(() => {
@@ -166,44 +186,111 @@ const LearningOutcomes = () => {
     );
   };
 
-  if (isLoading) return <LoadingState label="Loading Learning Outcomes..." />;
-  if (fetchError) return <ErrorState message="Unable to load Learning Outcomes." onRetry={refetch} />;
-
   const columns = [
     { key: 'code', label: 'Code' },
     { key: 'description', label: 'Description' }
   ];
+
+  // Filter outcomes by selected course (if course_id field exists)
+  const allOutcomes = data || [];
+  const outcomes = selectedCourseId 
+    ? allOutcomes.filter((outcome) => {
+        const outcomeCourseId = outcome.course_id || outcome.course?.id;
+        if (outcomeCourseId === undefined || outcomeCourseId === null) {
+          return true; // Backend should have filtered these
+        }
+        return (
+          outcomeCourseId.toString() === selectedCourseId.toString() ||
+          outcomeCourseId === parseInt(selectedCourseId) ||
+          outcomeCourseId === selectedCourseId
+        );
+      })
+    : [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">Learning Outcomes</h2>
-          <p className="text-sm text-slate-500">Manage all Learning Outcomes (LOs) and their PO connections</p>
+          <p className="text-sm text-slate-500">Select a course to view and manage its Learning Outcomes (LOs) and their PO connections</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
+          disabled={!selectedCourseId}
+          title={!selectedCourseId ? 'Please select a course first' : ''}
         >
           + Create LO
         </button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data || []}
-        onEdit={handleOpenModal}
-        onDelete={handleDelete}
-        emptyMessage="No Learning Outcomes found. Create your first LO."
-        customActions={(row) => (
+      {/* Course Selection */}
+      <div className="p-6 bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="course-select" className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Select Course
+          </label>
           <button
-            onClick={() => handleOpenConnectionModal(row)}
-            className="px-3 py-1.5 text-sm font-medium text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+            onClick={() => refetchCourses()}
+            disabled={coursesLoading}
+            className="px-3 py-1 text-xs font-medium text-brand-600 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-500/10 disabled:opacity-50"
           >
-            Connect PO
+            {coursesLoading ? 'Loading...' : 'Refresh'}
           </button>
+        </div>
+        <select
+          id="course-select"
+          value={selectedCourseId}
+          onChange={(e) => setSelectedCourseId(e.target.value)}
+          className="w-full px-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+          disabled={coursesLoading}
+        >
+          <option value="">-- Select a course --</option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.code} - {course.name}
+            </option>
+          ))}
+        </select>
+        {coursesLoading && (
+          <p className="mt-2 text-sm text-slate-400 italic">Loading courses...</p>
         )}
-      />
+        {!coursesLoading && courses.length === 0 && (
+          <p className="mt-2 text-sm text-slate-400 italic">No courses available</p>
+        )}
+        {!coursesLoading && courses.length > 0 && (
+          <p className="mt-2 text-xs text-slate-400">
+            {courses.length} course{courses.length !== 1 ? 's' : ''} available
+          </p>
+        )}
+      </div>
+
+      {/* Learning Outcomes Table */}
+      {!selectedCourseId ? (
+        <div className="p-8 text-center bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+          <p className="text-sm text-slate-400 italic">Please select a course to view learning outcomes</p>
+        </div>
+      ) : isLoading ? (
+        <LoadingState label="Loading Learning Outcomes..." />
+      ) : fetchError ? (
+        <ErrorState message="Unable to load Learning Outcomes." onRetry={refetch} />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={outcomes}
+          onEdit={handleOpenModal}
+          onDelete={handleDelete}
+          emptyMessage="No Learning Outcomes found for this course. Create your first LO."
+          customActions={(row) => (
+            <button
+              onClick={() => handleOpenConnectionModal(row)}
+              className="px-3 py-1.5 text-sm font-medium text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+            >
+              Connect PO
+            </button>
+          )}
+        />
+      )}
 
       <Modal
         isOpen={isModalOpen}

@@ -10,8 +10,9 @@ import FormField from '../../components/admin/FormField';
 import clsx from 'clsx';
 
 const Users = () => {
-  const { adminId } = useOutletContext();
+  // const outletContext = useOutletContext(); // Context causing crash
   const [searchParams, setSearchParams] = useSearchParams();
+  const adminId = searchParams.get('adminId') || 'current';
   const navigate = useNavigate();
   const activeTab = searchParams.get('tab') || 'students';
 
@@ -54,32 +55,32 @@ const Users = () => {
   // Load student options from localStorage and merge with existing student and professor data
   useEffect(() => {
     const storedOptions = adminService.getStudentOptions();
-    
+
     // Extract unique values from students
-    const majorsFromStudents = studentsData && studentsData.length > 0 
+    const majorsFromStudents = studentsData && studentsData.length > 0
       ? [...new Set(studentsData.filter(s => s.major).map(s => s.major))].sort()
       : [];
-    
+
     const cohortsFromStudents = studentsData && studentsData.length > 0
       ? [...new Set(studentsData.filter(s => s.cohort).map(s => s.cohort))].sort()
       : [];
-    
+
     const advisorsFromStudents = studentsData && studentsData.length > 0
       ? [...new Set(studentsData.filter(s => s.advisor).map(s => s.advisor))].sort()
       : [];
-    
+
     // Extract advisor names from professors (professors can be advisors)
     const advisorsFromProfessors = professorsData && professorsData.length > 0
       ? [...new Set(professorsData.filter(p => p.name).map(p => p.name))].sort()
       : [];
-    
+
     // Merge stored options with values from students and professors (avoid duplicates)
     const mergedOptions = {
       majors: [...new Set([...storedOptions.majors, ...majorsFromStudents])].sort(),
       cohorts: [...new Set([...storedOptions.cohorts, ...cohortsFromStudents])].sort(),
       advisors: [...new Set([...storedOptions.advisors, ...advisorsFromStudents, ...advisorsFromProfessors])].sort()
     };
-    
+
     setStudentOptions(mergedOptions);
   }, [studentsData, professorsData]);
 
@@ -148,7 +149,7 @@ const Users = () => {
     setError(null);
     setSuccess(null);
     setIsManageCoursesModalOpen(true);
-    
+
     // Load student enrollments
     setEnrollmentsLoading(true);
     try {
@@ -185,36 +186,36 @@ const Users = () => {
         studentId: managingCoursesUser.id,
         enrollmentId: enrollmentId
       });
-      
+
       const response = await adminService.removeStudentFromCourse(managingCoursesUser.id, enrollmentId);
       console.log('[DEBUG] Remove course response:', response);
-      
+
       setError(null);
       setSuccess('Course removed successfully!');
-      
+
       // Wait a bit for backend to process
       await new Promise(resolve => setTimeout(resolve, 300));
-      
+
       // Refresh enrollments
       console.log('[DEBUG] Refreshing enrollments after course removal...');
       const enrollments = await adminService.getStudentEnrollments(managingCoursesUser.id);
       console.log('[DEBUG] Refreshed enrollments after removal:', enrollments);
       setStudentEnrollments(Array.isArray(enrollments) ? enrollments : []);
-      
+
       // Update localStorage if this is the currently logged in student
       const storedStudentId = localStorage.getItem('studentId');
       const managingStudentId = managingCoursesUser?.student_id || managingCoursesUser?.id?.toString();
-      
-      if (storedStudentId && managingStudentId && 
-          (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
+
+      if (storedStudentId && managingStudentId &&
+        (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
         setTimeout(async () => {
           try {
             const students = await adminService.getStudents();
             const updatedStudentData = students.find(
-              (s) => s.id === managingCoursesUser?.id || 
-                     s.student_id === managingStudentId || 
-                     s.id.toString() === managingStudentId ||
-                     (managingCoursesUser?.id && s.id === managingCoursesUser.id)
+              (s) => s.id === managingCoursesUser?.id ||
+                s.student_id === managingStudentId ||
+                s.id.toString() === managingStudentId ||
+                (managingCoursesUser?.id && s.id === managingCoursesUser.id)
             );
             if (updatedStudentData) {
               localStorage.setItem('studentInfo', JSON.stringify({
@@ -237,7 +238,7 @@ const Users = () => {
           }
         }, 500);
       }
-      
+
       // Refresh students list
       refetchStudents();
     } catch (err) {
@@ -269,10 +270,10 @@ const Users = () => {
         studentId: managingCoursesUser.id,
         courseId: selectedCourse
       });
-      
+
       const response = await adminService.assignStudentToCourse(managingCoursesUser.id, selectedCourse);
       console.log('[DEBUG] Course assignment response:', response);
-      
+
       // Backend returns: {message: "...", enrollment: {...}}
       // Verify that backend actually created the enrollment
       if (response && response.enrollment) {
@@ -284,35 +285,35 @@ const Users = () => {
         console.warn('[DEBUG] Response:', response);
         // Still try to refresh enrollments in case it was created
       }
-      
+
       // Clear error if any
       setError(null);
       setSuccess('Course assigned successfully!');
-      
+
       // Wait a bit for backend to process
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Refresh enrollments with retry logic
       console.log('[DEBUG] Refreshing enrollments after course assignment...');
       let enrollments = [];
       let retries = 3;
-      
+
       while (retries > 0) {
         try {
           enrollments = await adminService.getStudentEnrollments(managingCoursesUser.id);
           console.log('[DEBUG] Refreshed enrollments (attempt):', enrollments);
-          
+
           // If we got enrollments and they include the new course, break
           if (Array.isArray(enrollments) && enrollments.length > 0) {
-            const hasNewCourse = enrollments.some(e => 
-              e.course?.id?.toString() === selectedCourse.toString() || 
+            const hasNewCourse = enrollments.some(e =>
+              e.course?.id?.toString() === selectedCourse.toString() ||
               e.course_id?.toString() === selectedCourse.toString()
             );
             if (hasNewCourse || enrollments.length > studentEnrollments.length) {
               break;
             }
           }
-          
+
           // If still no enrollments, wait and retry
           if (enrollments.length === 0 && retries > 1) {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -322,27 +323,27 @@ const Users = () => {
         }
         retries--;
       }
-      
+
       console.log('[DEBUG] Final enrollments:', enrollments);
       setStudentEnrollments(Array.isArray(enrollments) ? enrollments : []);
-      
+
       // Clear selected course
       setSelectedCourse('');
-      
+
       // Update localStorage if this is the currently logged in student
       const storedStudentId = localStorage.getItem('studentId');
       const managingStudentId = managingCoursesUser?.student_id || managingCoursesUser?.id?.toString();
-      
-      if (storedStudentId && managingStudentId && 
-          (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
+
+      if (storedStudentId && managingStudentId &&
+        (storedStudentId === managingStudentId || storedStudentId === managingCoursesUser?.id?.toString())) {
         setTimeout(async () => {
           try {
             const students = await adminService.getStudents();
             const updatedStudentData = students.find(
-              (s) => s.id === managingCoursesUser?.id || 
-                     s.student_id === managingStudentId || 
-                     s.id.toString() === managingStudentId ||
-                     (managingCoursesUser?.id && s.id === managingCoursesUser.id)
+              (s) => s.id === managingCoursesUser?.id ||
+                s.student_id === managingStudentId ||
+                s.id.toString() === managingStudentId ||
+                (managingCoursesUser?.id && s.id === managingCoursesUser.id)
             );
             if (updatedStudentData) {
               localStorage.setItem('studentInfo', JSON.stringify({
@@ -365,7 +366,7 @@ const Users = () => {
           }
         }, 500);
       }
-      
+
       // Refresh students list
       refetchStudents();
     } catch (err) {
@@ -397,28 +398,28 @@ const Users = () => {
           await adminService.createStudent(cleanedFormData);
           setSuccess('Student created successfully!');
         }
-        
+
         // Close modal first
         handleCloseModal();
-        
+
         // Refetch students data immediately to update the table
         await refetchStudents();
-        
+
         // Update localStorage if this is the currently logged in student
         const storedStudentId = localStorage.getItem('studentId');
         const editingStudentId = editingUser?.student_id || editingUser?.id?.toString();
-        
-        if (storedStudentId && editingStudentId && 
-            (storedStudentId === editingStudentId || storedStudentId === editingUser?.id?.toString())) {
+
+        if (storedStudentId && editingStudentId &&
+          (storedStudentId === editingStudentId || storedStudentId === editingUser?.id?.toString())) {
           // Get the updated student data from the refetched list
           setTimeout(async () => {
             try {
               const students = await adminService.getStudents();
               const updatedStudentData = students.find(
-                (s) => s.id === editingUser?.id || 
-                       s.student_id === editingStudentId || 
-                       s.id.toString() === editingStudentId ||
-                       (editingUser?.id && s.id === editingUser.id)
+                (s) => s.id === editingUser?.id ||
+                  s.student_id === editingStudentId ||
+                  s.id.toString() === editingStudentId ||
+                  (editingUser?.id && s.id === editingUser.id)
               );
               if (updatedStudentData) {
                 localStorage.setItem('studentInfo', JSON.stringify({
@@ -470,6 +471,19 @@ const Users = () => {
         await adminService.deleteStudent(user.id);
         refetchStudents();
       } else {
+        // Before deleting professor, remove from advisor list in student options
+        if (user.name) {
+          const storedOptions = adminService.getStudentOptions();
+          const updatedAdvisors = storedOptions.advisors.filter(advisor => advisor !== user.name);
+          if (updatedAdvisors.length !== storedOptions.advisors.length) {
+            const updatedOptions = {
+              ...storedOptions,
+              advisors: updatedAdvisors
+            };
+            adminService.saveStudentOptions(updatedOptions);
+          }
+        }
+
         await adminService.deleteProfessor(user.id);
         refetchProfessors();
       }
@@ -552,36 +566,36 @@ const Users = () => {
         customActions={
           isStudentTab
             ? (row) => (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const studentId = row.student_id || row.id.toString();
-                      localStorage.setItem('studentId', studentId);
-                      // Save student info for quick access
-                      localStorage.setItem('studentInfo', JSON.stringify({
-                        id: row.id,
-                        student_id: row.student_id || row.id.toString(),
-                        name: row.name,
-                        email: row.email,
-                        major: row.major,
-                        cohort: row.cohort,
-                        advisor: row.advisor
-                      }));
-                      navigate(`/student/dashboard?studentId=${studentId}`);
-                    }}
-                    className="px-3 py-1.5 text-sm font-medium text-brand-600 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-500/10"
-                    title="View as Student"
-                  >
-                    View
-                  </button>
-                  <button
-                    onClick={() => handleOpenManageCoursesModal(row)}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10"
-                  >
-                    Manage Courses
-                  </button>
-                </div>
-              )
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const studentId = row.student_id || row.id.toString();
+                    localStorage.setItem('studentId', studentId);
+                    // Save student info for quick access
+                    localStorage.setItem('studentInfo', JSON.stringify({
+                      id: row.id,
+                      student_id: row.student_id || row.id.toString(),
+                      name: row.name,
+                      email: row.email,
+                      major: row.major,
+                      cohort: row.cohort,
+                      advisor: row.advisor
+                    }));
+                    navigate(`/student/dashboard?studentId=${studentId}`);
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-brand-600 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                  title="View as Student"
+                >
+                  View
+                </button>
+                <button
+                  onClick={() => handleOpenManageCoursesModal(row)}
+                  className="px-3 py-1.5 text-sm font-medium text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10"
+                >
+                  Manage Courses
+                </button>
+              </div>
+            )
             : null
         }
       />

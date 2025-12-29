@@ -87,7 +87,30 @@ const StudentLearningOutcomes = () => {
   
   const { data, isLoading, error } = useAsyncResource(outcomesLoader);
 
-  const outcomes = data || [];
+  // Filter outcomes by selected course (backend should filter, but double-check on frontend)
+  const allOutcomes = data || [];
+  const outcomes = selectedCourseId 
+    ? allOutcomes.filter((outcome) => {
+        // Check if outcome has course_id or course.id that matches selectedCourseId
+        const outcomeCourseId = outcome.course_id || outcome.course?.id;
+        // If outcome doesn't have course info, only include if backend filtered correctly
+        // Since we're sending courseId to backend, assume backend filtered it
+        // But if outcome has course_id, verify it matches selected course
+        if (outcomeCourseId === undefined || outcomeCourseId === null) {
+          // Backend should have filtered these, but if it didn't, we can't verify
+          // So we include them (assuming backend filtered correctly)
+          // If backend doesn't filter, this is a backend issue
+          return true;
+        }
+        // Filter by course_id match (handle both string and number comparison)
+        return (
+          outcomeCourseId.toString() === selectedCourseId.toString() ||
+          outcomeCourseId === parseInt(selectedCourseId) ||
+          outcomeCourseId === selectedCourseId
+        );
+      })
+    : [];
+
   const hasData = outcomes.length > 0 && !error && !isLoading && selectedCourseId;
 
   return (

@@ -1,59 +1,67 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import adminService from '../../services/adminService';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import professorService from '../../services/professorService';
 import useAsyncResource from '../../hooks/useAsyncResource';
 
 const ProfessorCourseSelection = () => {
   const navigate = useNavigate();
+  const { professorId: pathProfessorId } = useParams();
   const [searchParams] = useSearchParams();
   const [professorInfo, setProfessorInfo] = useState(null);
   
-  const professorId = searchParams.get('professorId') || localStorage.getItem('professorId');
+  // Support both path params (new) and query params (legacy)
+  const professorId = pathProfessorId || searchParams.get('professorId') || localStorage.getItem('professorId');
   
-  // Load professor info
+  // Redirect legacy query param URLs to new path-based URLs
+  useEffect(() => {
+    if (!pathProfessorId && professorId) {
+      navigate(`/professor/${professorId}/courses`, { replace: true });
+    }
+  }, [pathProfessorId, professorId, navigate]);
+  
+  // Load professor info from backend
   useEffect(() => {
     if (professorId) {
-      try {
-        const storedInfo = localStorage.getItem('professorInfo');
-        if (storedInfo) {
-          setProfessorInfo(JSON.parse(storedInfo));
-        } else {
-          adminService.getProfessors().then(professors => {
-            const professor = professors.find(p => p.id.toString() === professorId);
-            if (professor) {
-              const info = {
-                id: professor.id,
-                name: professor.name,
-                email: professor.email
-              };
-              setProfessorInfo(info);
-              localStorage.setItem('professorInfo', JSON.stringify(info));
+      // Try to load from backend first
+      professorService.getProfessor(professorId)
+        .then(professor => {
+          const info = {
+            id: professor.id,
+            name: professor.name,
+            email: professor.email
+          };
+          setProfessorInfo(info);
+          localStorage.setItem('professorId', professorId);
+          localStorage.setItem('professorInfo', JSON.stringify(info));
+        })
+        .catch(() => {
+          // Fallback to localStorage if backend fails
+          try {
+            const storedInfo = localStorage.getItem('professorInfo');
+            if (storedInfo) {
+              setProfessorInfo(JSON.parse(storedInfo));
             }
-          });
-        }
-      } catch (e) {
-        // Ignore errors
-      }
+          } catch (e) {
+            // Ignore errors
+          }
+        });
     } else {
       // No professor ID, redirect to login
       navigate('/professor/login');
     }
   }, [professorId, navigate]);
 
-  // Load courses assigned to this professor
+  // Load courses assigned to this professor using proper backend endpoint
   const coursesLoader = useCallback(() => {
     if (!professorId) return Promise.resolve([]);
-    return adminService.getCourses().then(courses => {
-      // Filter courses assigned to this professor
-      return courses.filter(course => course.professor_id && course.professor_id.toString() === professorId.toString());
-    });
+    return professorService.getProfessorCourses(professorId);
   }, [professorId]);
   
   const { data: coursesData, isLoading: coursesLoading } = useAsyncResource(coursesLoader);
   const courses = coursesData || [];
 
   const handleCourseSelect = (courseId) => {
-    navigate(`/professor?professorId=${professorId}&courseId=${courseId}`);
+    navigate(`/professor/${professorId}/courses/${courseId}`);
   };
 
   const handleLogout = () => {

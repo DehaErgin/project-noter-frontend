@@ -116,12 +116,6 @@ const StudentProfile = () => {
           <h2 className="text-2xl font-semibold">Student Profile</h2>
           <p className="text-sm text-slate-500">Basic information linked to your academic record.</p>
         </div>
-        <button
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
-        >
-          Toggle {theme === 'light' ? 'Dark' : 'Light'} Mode
-        </button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

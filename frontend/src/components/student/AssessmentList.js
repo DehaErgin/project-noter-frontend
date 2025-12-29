@@ -35,7 +35,7 @@ const AssessmentList = ({ assessments = [] }) => {
                   </span>
                 </td>
                 <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-                  {assessment.grade}%
+                  {assessment.grade ?? assessment.score ?? 'N/A'}%
                 </td>
                 <td className="px-6 py-4 text-slate-500">{Math.round(assessment.weight * 100)}%</td>
                 <td className="px-6 py-4">

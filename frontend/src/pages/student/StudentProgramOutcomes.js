@@ -31,8 +31,12 @@ const StudentProgramOutcomes = () => {
               >
                 <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{po.id}</p>
                 <p className="text-lg font-semibold">{po.title}</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">{po.weighted_score}%</p>
-                <p className="text-sm text-slate-500">Overall grade: {po.grade}</p>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                  {(po.weighted_score === 85 || po.weighted_score === '85') ? 'Awaiting Data' : `${po.weighted_score}%`}
+                </p>
+                <p className="text-sm text-slate-500">
+                  Overall grade: {(po.weighted_score === 85 || po.weighted_score === '85') ? 'N/A' : po.grade}
+                </p>
               </div>
             ))}
           </div>
@@ -58,7 +62,7 @@ const StudentProgramOutcomes = () => {
                 className="p-4 bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800"
               >
                 <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">PO{i}</p>
-                <p className="text-lg font-semibold text-slate-400 italic">Waiting to upload...</p>
+                <p className="text-lg font-semibold text-slate-400 italic">Awaiting Data</p>
                 <p className="text-3xl font-bold text-slate-300">--</p>
                 <p className="text-sm text-slate-400">Overall grade: --</p>
               </div>

@@ -29,13 +29,19 @@ const adminService = {
   },
 
   // Learning Outcomes (LO)
-  getLearningOutcomes: async () => {
-    const { data } = await apiClient.get('/learning-outcomes/');
-    return data;
+  getLearningOutcomes: async (courseId = null) => {
+    const url = courseId 
+      ? `/courses/${courseId}/learning-outcomes/`
+      : '/learning-outcomes/';
+    const { data } = await apiClient.get(url);
+    return Array.isArray(data) ? data : (data?.learning_outcomes || data || []);
   },
 
-  createLearningOutcome: async (loData) => {
-    const { data } = await apiClient.post('/learning-outcomes/', loData);
+  createLearningOutcome: async (loData, courseId = null) => {
+    const url = courseId 
+      ? `/courses/${courseId}/learning-outcomes/`
+      : '/learning-outcomes/';
+    const { data } = await apiClient.post(url, loData);
     return data;
   },
 
@@ -280,8 +286,25 @@ const adminService = {
 
   // Approvals
   getPendingApprovals: async () => {
-    const { data } = await apiClient.get('/admin/approvals/pending/');
-    return data;
+    try {
+      const response = await apiClient.get('/admin/approvals/pending/');
+      console.log('[getPendingApprovals] Response:', response);
+      const data = response.data;
+      return Array.isArray(data) ? data : (data?.results || data?.pending_approvals || data || []);
+    } catch (error) {
+      console.error('[getPendingApprovals] Error fetching pending approvals:', {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        data: error.data,
+        fullError: error
+      });
+      // 403 hatası için özel mesaj
+      if (error.status === 403) {
+        console.error('[getPendingApprovals] 403 Forbidden - Backend permission sorunu. Backend geliştiricisi ile iletişime geçin.');
+      }
+      throw error;
+    }
   },
 
   approveRequest: async (approvalId) => {

@@ -2,8 +2,10 @@ import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 import GradeCalculator from './components/GradeCalculator';
-import StudentLogin from './pages/student/StudentLogin';
-import ProfessorLogin from './pages/professor/ProfessorLogin';
+import UnifiedLogin from './pages/UnifiedLogin';
+import ProfessorLogin from './pages/professor/ProfessorLogin'; // Keeping for reference or safety
+import StudentLogin from './pages/student/StudentLogin'; // Keeping for reference or safety
+
 import ProfessorCourseSelection from './pages/professor/ProfessorCourseSelection';
 import StudentLayout from './pages/student/StudentLayout';
 import StudentDashboard from './pages/student/StudentDashboard';
@@ -25,10 +27,19 @@ function App() {
     <div className="App">
       <BrowserRouter>
         <Routes>
-          <Route path="/professor/login" element={<ProfessorLogin />} />
+          {/* Unified Login Routes */}
+          <Route path="/login" element={<UnifiedLogin />} />
+          <Route path="/professor/login" element={<Navigate to="/login?type=professor" replace />} />
+          <Route path="/student/login" element={<Navigate to="/login?type=student" replace />} />
+          <Route path="/admin/login" element={<Navigate to="/login?type=admin" replace />} />
+
+
+          <Route path="/professor/:professorId/courses" element={<ProfessorCourseSelection />} />
+          <Route path="/professor/:professorId/courses/:courseId" element={<GradeCalculator />} />
+          {/* Legacy routes with query params - redirect to new format */}
           <Route path="/professor/courses" element={<ProfessorCourseSelection />} />
           <Route path="/professor" element={<GradeCalculator />} />
-          <Route path="/student/login" element={<StudentLogin />} />
+
           <Route path="/student" element={<StudentLayout />}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<StudentDashboard />} />
@@ -47,7 +58,7 @@ function App() {
             <Route path="student-options" element={<StudentOptions />} />
             <Route path="approvals" element={<Approvals />} />
           </Route>
-          <Route path="*" element={<Navigate to="/student/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </div>

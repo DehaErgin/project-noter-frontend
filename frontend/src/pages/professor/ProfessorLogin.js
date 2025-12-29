@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import adminService from '../../services/adminService';
+import professorService from '../../services/professorService';
 import FormField from '../../components/admin/FormField';
 
 const ProfessorLogin = () => {
@@ -15,11 +15,8 @@ const ProfessorLogin = () => {
     setIsLoading(true);
 
     try {
-      // Check if professor exists by trying to get the professor list and find the email
-      const professors = await adminService.getProfessors();
-      const professor = professors.find(
-        (p) => p.email && p.email.toLowerCase().trim() === email.toLowerCase().trim()
-      );
+      // Check if professor exists using the professor service
+      const professor = await professorService.getProfessorByEmail(email.trim());
 
       if (professor) {
         // Professor found, save to localStorage and navigate
@@ -31,7 +28,7 @@ const ProfessorLogin = () => {
           name: professor.name,
           email: professor.email
         }));
-        navigate(`/professor/courses?professorId=${professorId}`);
+        navigate(`/professor/${professorId}/courses`);
       } else {
         setError('Professor email not found. Please check your email and try again.');
       }

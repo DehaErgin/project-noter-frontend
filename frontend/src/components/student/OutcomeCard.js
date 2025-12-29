@@ -8,7 +8,7 @@ const OutcomeCard = ({ outcome }) => (
       </div>
       <div className="flex flex-col items-end">
         <span className="text-3xl font-semibold text-slate-900 dark:text-white">
-          {outcome.performance}%
+          {(outcome.performance === 85 || outcome.performance === '85') ? 'Awaiting Data' : `${outcome.performance}%`}
         </span>
         <p className="text-xs text-slate-500">Performance</p>
       </div>

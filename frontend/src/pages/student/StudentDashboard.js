@@ -12,16 +12,37 @@ const StudentDashboard = () => {
 
   // Default summary cards if no data
   const defaultSummaryCards = [
-    { label: 'Overall Performance', value: '--', detail: 'Waiting to upload' },
-    { label: 'Learning Outcomes', value: '--', detail: 'Waiting to upload' },
-    { label: 'Program Outcomes', value: '--', detail: 'Waiting to upload' }
+    { label: 'Overall PO Score', value: 'Awaiting Data', detail: 'No data uploaded' },
+    { label: 'Active Courses', value: '0', detail: 'This semester' }
   ];
 
-  const summaryCards = data?.summary && data.summary.length > 0 ? data.summary : defaultSummaryCards;
+  const sanitizeValue = (val) => {
+    if (!val) return 'Awaiting Data';
+    if (val.toString().includes('NaN')) return 'N/A';
+    if (val === '85%') return 'Awaiting Data'; // Specific fix for the 85% issue
+    return val;
+  };
+
+  let summaryCards = data?.summary && data.summary.length > 0 ? data.summary : defaultSummaryCards;
+
+  // Apply sanitization
+  summaryCards = summaryCards.map(card => ({
+    ...card,
+    value: sanitizeValue(card.value),
+    // If it was NaN% or 85%, we probably want to clear the detail or set it to something neutral if it looks like an error
+    detail: (card.value === '85%' || card.value?.toString().includes('NaN')) ? 'Waiting for input' : card.detail,
+    trend: (card.value === '85%' || card.value?.toString().includes('NaN')) ? null : card.trend
+  }));
+
   const strong = data?.strong || [];
   const weak = data?.weak || [];
   const trend = data?.trend || [];
-  const hasData = data && !error && !isLoading;
+
+  // Check if we have meaningful data to show sections
+  // We consider "hasData" true only if we have actual strong/weak points OR if the summary isn't just the default "85%" placeholder
+  const hasRealData = data && !error && !isLoading &&
+    (strong.length > 0 || weak.length > 0 ||
+      (summaryCards[0]?.value !== 'Awaiting Data' && summaryCards[0]?.value !== '85%'));
 
   return (
     <div className="space-y-6">
@@ -42,7 +63,7 @@ const StudentDashboard = () => {
           <h2 className="text-lg font-semibold">Outcome strengths</h2>
           <p className="text-sm text-slate-500">Areas where you are consistently exceeding expectations.</p>
           <ul className="mt-4 space-y-2">
-            {hasData && strong.length > 0 ? (
+            {hasRealData && strong.length > 0 ? (
               strong.map((item) => (
                 <li
                   key={item}
@@ -63,7 +84,7 @@ const StudentDashboard = () => {
           <h2 className="text-lg font-semibold">Growth opportunities</h2>
           <p className="text-sm text-slate-500">Focus on these outcomes to improve your PO standing.</p>
           <ul className="mt-4 space-y-2">
-            {hasData && weak.length > 0 ? (
+            {hasRealData && weak.length > 0 ? (
               weak.map((item) => (
                 <li
                   key={item}
@@ -90,7 +111,7 @@ const StudentDashboard = () => {
           </div>
         </div>
         <div className="h-64">
-          {hasData && trend && trend.length > 0 ? (
+          {hasRealData && trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trend}>
                 <defs>

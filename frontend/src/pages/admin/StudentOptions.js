@@ -1,7 +1,52 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import useAsyncResource from '../../hooks/useAsyncResource';
 import adminService from '../../services/adminService';
+
+const OptionList = memo(({ title, items, onAdd, newValue, setNewValue, onRemove }) => (
+  <div className="p-6 bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
+    <h3 className="text-lg font-semibold mb-4">{title}</h3>
+    
+    <div className="flex gap-2 mb-4">
+      <input
+        type="text"
+        value={newValue}
+        onChange={(e) => setNewValue(e.target.value)}
+        onKeyPress={(e) => e.key === 'Enter' && onAdd()}
+        placeholder={`Add new ${title.toLowerCase()}...`}
+        className="flex-1 px-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+      />
+      <button
+        onClick={onAdd}
+        className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700"
+      >
+        Add
+      </button>
+    </div>
+
+    <div className="flex flex-wrap gap-2">
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-500">No {title.toLowerCase()} added yet.</p>
+      ) : (
+        items.map((item) => (
+          <span
+            key={item}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          >
+            {item}
+            <button
+              onClick={() => onRemove(item)}
+              className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
+              title="Remove"
+            >
+              ×
+            </button>
+          </span>
+        ))
+      )}
+    </div>
+  </div>
+));
 
 const StudentOptions = () => {
   const { adminId } = useOutletContext();
@@ -62,120 +107,95 @@ const StudentOptions = () => {
     setOptions(loadedOptions);
   };
 
-  const saveOptions = (updatedOptions = null) => {
-    const optionsToSave = updatedOptions || options;
-    adminService.saveStudentOptions(optionsToSave);
+  const saveOptions = useCallback((updatedOptions) => {
+    adminService.saveStudentOptions(updatedOptions);
     setSuccess('Options saved successfully!');
     setTimeout(() => setSuccess(null), 3000);
-  };
+  }, []);
 
-  const addMajor = () => {
-    if (newMajor.trim() && !options.majors.includes(newMajor.trim())) {
-      const updated = {
-        ...options,
-        majors: [...options.majors, newMajor.trim()].sort()
-      };
-      setOptions(updated);
+  const addMajor = useCallback(() => {
+    if (newMajor.trim()) {
+      setOptions((prevOptions) => {
+        if (!prevOptions.majors.includes(newMajor.trim())) {
+          const updated = {
+            ...prevOptions,
+            majors: [...prevOptions.majors, newMajor.trim()].sort()
+          };
+          saveOptions(updated);
+          return updated;
+        }
+        return prevOptions;
+      });
       setNewMajor('');
-      saveOptions(updated);
     }
-  };
+  }, [newMajor, saveOptions]);
 
-  const removeMajor = (major) => {
-    const updated = {
-      ...options,
-      majors: options.majors.filter(m => m !== major)
-    };
-    setOptions(updated);
-    saveOptions(updated);
-  };
-
-  const addCohort = () => {
-    if (newCohort.trim() && !options.cohorts.includes(newCohort.trim())) {
+  const removeMajor = useCallback((major) => {
+    setOptions((prevOptions) => {
       const updated = {
-        ...options,
-        cohorts: [...options.cohorts, newCohort.trim()].sort()
+        ...prevOptions,
+        majors: prevOptions.majors.filter(m => m !== major)
       };
-      setOptions(updated);
+      saveOptions(updated);
+      return updated;
+    });
+  }, [saveOptions]);
+
+  const addCohort = useCallback(() => {
+    if (newCohort.trim()) {
+      setOptions((prevOptions) => {
+        if (!prevOptions.cohorts.includes(newCohort.trim())) {
+          const updated = {
+            ...prevOptions,
+            cohorts: [...prevOptions.cohorts, newCohort.trim()].sort()
+          };
+          saveOptions(updated);
+          return updated;
+        }
+        return prevOptions;
+      });
       setNewCohort('');
-      saveOptions(updated);
     }
-  };
+  }, [newCohort, saveOptions]);
 
-  const removeCohort = (cohort) => {
-    const updated = {
-      ...options,
-      cohorts: options.cohorts.filter(c => c !== cohort)
-    };
-    setOptions(updated);
-    saveOptions(updated);
-  };
-
-  const addAdvisor = () => {
-    if (newAdvisor.trim() && !options.advisors.includes(newAdvisor.trim())) {
+  const removeCohort = useCallback((cohort) => {
+    setOptions((prevOptions) => {
       const updated = {
-        ...options,
-        advisors: [...options.advisors, newAdvisor.trim()].sort()
+        ...prevOptions,
+        cohorts: prevOptions.cohorts.filter(c => c !== cohort)
       };
-      setOptions(updated);
-      setNewAdvisor('');
       saveOptions(updated);
+      return updated;
+    });
+  }, [saveOptions]);
+
+  const addAdvisor = useCallback(() => {
+    if (newAdvisor.trim()) {
+      setOptions((prevOptions) => {
+        if (!prevOptions.advisors.includes(newAdvisor.trim())) {
+          const updated = {
+            ...prevOptions,
+            advisors: [...prevOptions.advisors, newAdvisor.trim()].sort()
+          };
+          saveOptions(updated);
+          return updated;
+        }
+        return prevOptions;
+      });
+      setNewAdvisor('');
     }
-  };
+  }, [newAdvisor, saveOptions]);
 
-  const removeAdvisor = (advisor) => {
-    const updated = {
-      ...options,
-      advisors: options.advisors.filter(a => a !== advisor)
-    };
-    setOptions(updated);
-    saveOptions(updated);
-  };
-
-  const OptionList = ({ title, items, onAdd, newValue, setNewValue, onRemove }) => (
-    <div className="p-6 bg-white rounded-2xl shadow-card ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-slate-800">
-      <h3 className="text-lg font-semibold mb-4">{title}</h3>
-      
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={newValue}
-          onChange={(e) => setNewValue(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && onAdd()}
-          placeholder={`Add new ${title.toLowerCase()}...`}
-          className="flex-1 px-4 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
-        />
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700"
-        >
-          Add
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {items.length === 0 ? (
-          <p className="text-sm text-slate-500">No {title.toLowerCase()} added yet.</p>
-        ) : (
-          items.map((item) => (
-            <span
-              key={item}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-            >
-              {item}
-              <button
-                onClick={() => onRemove(item)}
-                className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
-                title="Remove"
-              >
-                ×
-              </button>
-            </span>
-          ))
-        )}
-      </div>
-    </div>
-  );
+  const removeAdvisor = useCallback((advisor) => {
+    setOptions((prevOptions) => {
+      const updated = {
+        ...prevOptions,
+        advisors: prevOptions.advisors.filter(a => a !== advisor)
+      };
+      saveOptions(updated);
+      return updated;
+    });
+  }, [saveOptions]);
 
   return (
     <div className="space-y-6">

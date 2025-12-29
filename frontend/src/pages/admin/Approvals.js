@@ -47,7 +47,9 @@ const Approvals = () => {
     const labels = {
       lo_po_mapping: 'LO ↔ PO Mapping',
       grade_condition: 'Grade Condition Change',
-      course_modification: 'Course Modification'
+      course_modification: 'Course Modification',
+      assessment_creation: 'Assessment Creation',
+      lo_creation: 'Learning Outcome Creation'
     };
     return labels[type] || type;
   };
@@ -56,7 +58,9 @@ const Approvals = () => {
     const colors = {
       lo_po_mapping: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
       grade_condition: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
-      course_modification: 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300'
+      course_modification: 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300',
+      assessment_creation: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
+      lo_creation: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'
     };
     return colors[type] || 'bg-slate-50 text-slate-700 dark:bg-slate-500/10 dark:text-slate-300';
   };
