@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useSearchParams } from 'react-router-dom';
+import { NavLink, Outlet, useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
@@ -15,11 +15,21 @@ const navItems = [
 const AdminLayout = () => {
   const [theme, setTheme] = useState('light');
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const adminId = searchParams.get('adminId') || 'current';
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
+
+  const handleLogout = () => {
+    // Clear admin-related data from localStorage
+    localStorage.removeItem('adminId');
+    localStorage.removeItem('adminInfo');
+
+    // Redirect to home page or login
+    navigate('/');
+  };
 
   return (
     <div
@@ -35,12 +45,20 @@ const AdminLayout = () => {
               <p className="text-xs font-semibold tracking-[0.3em] uppercase text-brand-500">Admin</p>
               <h1 className="text-2xl font-semibold">Administration Panel</h1>
             </div>
-            <button
-              onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
-              className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
-            >
-              {theme === 'light' ? 'Dark theme' : 'Light theme'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
+              >
+                {theme === 'light' ? 'Dark theme' : 'Light theme'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-700 border-2 border-slate-300 rounded-xl hover:bg-slate-100 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-800"
+              >
+                🚪 Logout
+              </button>
+            </div>
           </div>
           <nav className="w-full border-t border-slate-200 dark:border-slate-800">
             <div className="flex flex-wrap w-full max-w-6xl px-4 mx-auto">

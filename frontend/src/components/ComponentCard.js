@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import './ComponentCard.css';
 import Tooltip from './Tooltip';
 
@@ -12,25 +12,6 @@ const ComponentCard = ({
   isStatic = false,
   courseStudents = []
 }) => {
-<<<<<<< HEAD
-  const [gradeValue, setGradeValue] = useState(() => {
-    if (type !== 'assessment') return '';
-    const initial = (component.grades || [])[0];
-    return initial === undefined ? '' : String(initial);
-  });
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(component.name || '');
-
-  useEffect(() => {
-    if (type !== 'assessment') return;
-    const current = (component.grades || [])[0];
-    setGradeValue(current === undefined ? '' : String(current));
-  }, [component.grades, type]);
-
-  useEffect(() => {
-    setNameValue(component.name || '');
-  }, [component.name]);
-=======
   const [showGradeInput, setShowGradeInput] = useState(false);
   const [showPercentageInput, setShowPercentageInput] = useState(false);
   const [showPercentageCount, setShowPercentageCount] = useState(false);
@@ -43,7 +24,6 @@ const ComponentCard = ({
   const [editingPercentageValue, setEditingPercentageValue] = useState('');
   const [editingConnectionIndex, setEditingConnectionIndex] = useState(null);
   const [editingConnectionTargetId, setEditingConnectionTargetId] = useState('');
->>>>>>> super-user
 
   // Calculate total grade based on connections
   const calculateTotalGrade = () => {
@@ -117,43 +97,25 @@ const ComponentCard = ({
     return 0;
   };
 
-<<<<<<< HEAD
-  const persistAssessmentGrade = () => {
-    if (type !== 'assessment' || !onUpdate) return;
-    const trimmed = (gradeValue ?? '').toString().trim();
-    if (trimmed === '') {
-      const clearedComponent = { ...component, grades: [] };
-      onUpdate(clearedComponent);
-      return;
-    }
-    const parsed = parseFloat(trimmed);
-    if (Number.isNaN(parsed)) {
-      setGradeValue('');
-      return;
-    }
-    const updatedComponent = { ...component, grades: [parsed] };
-    onUpdate(updatedComponent);
-=======
   const addGrade = () => {
     if (!gradeValue || !selectedStudentForGrade) return;
 
     const newGrade = parseFloat(gradeValue);
     const studentId = selectedStudentForGrade;
-    
+
     // Store grades per student: { studentId: grade }
     const studentGrades = component.studentGrades || {};
     studentGrades[studentId] = newGrade;
-    
+
     const updatedComponent = {
       ...component,
       studentGrades: studentGrades
     };
-    
+
     onUpdate && onUpdate(updatedComponent);
     setGradeValue('');
     setSelectedStudentForGrade('');
     setShowGradeInput(false);
->>>>>>> super-user
   };
 
   const approveLearningOutcomeGrade = () => {
@@ -172,58 +134,89 @@ const ComponentCard = ({
     onUpdate && onUpdate(updatedComponent);
   };
 
-  const persistNameChange = () => {
-    if (!onUpdate) return;
-    const trimmed = (nameValue || '').trim();
-    if (!trimmed) {
-      setNameValue(component.name || '');
-      setIsEditingName(false);
+  const addPercentage = () => {
+    const pct = parseFloat(percentageValues[percentageFieldsCount - 1] || 0);
+    if (isNaN(pct) || pct <= 0) {
+      alert('Please enter a valid percentage value');
       return;
     }
-    if (trimmed === component.name) {
-      setIsEditingName(false);
+
+    const updatedComponent = {
+      ...component,
+      percentages: [...(component.percentages || []), pct]
+    };
+    onUpdate && onUpdate(updatedComponent);
+    setPercentageValues({});
+    setPercentageFieldsCount(0);
+    setShowPercentageInput(false);
+    setShowPercentageCount(false);
+  };
+
+  const deletePercentage = (index) => {
+    const updated = (component.percentages || []).filter((_, i) => i !== index);
+    // Also remove connections using this percentage
+    const updatedConnections = (component.connections || []).filter(c => c.percentageIndex !== index);
+    const updatedComponent = {
+      ...component,
+      percentages: updated,
+      connections: updatedConnections
+    };
+    onUpdate && onUpdate(updatedComponent);
+  };
+
+  const updatePercentage = (index, value) => {
+    const pct = parseFloat(value);
+    if (isNaN(pct) || pct <= 0) {
+      alert('Invalid percentage value');
       return;
     }
-    onUpdate({ ...component, name: trimmed });
-    setIsEditingName(false);
+    const updated = [...(component.percentages || [])];
+    updated[index] = pct;
+    const updatedComponent = { ...component, percentages: updated };
+    onUpdate && onUpdate(updatedComponent);
+    setEditingPercentageIndex(null);
+    setEditingPercentageValue('');
+  };
+
+  const addConnection = (percentageIndex) => {
+    if (type === 'assessment') {
+      if (!learningOutcomes || learningOutcomes.length === 0) {
+        alert('No learning outcomes available');
+        return;
+      }
+      const newConnection = {
+        type: 'learning',
+        targetId: learningOutcomes[0].id,
+        percentageIndex: percentageIndex
+      };
+      const updatedComponent = {
+        ...component,
+        connections: [...(component.connections || []), newConnection]
+      };
+      onUpdate && onUpdate(updatedComponent);
+    } else if (type === 'learning') {
+      if (!programOutcomes || programOutcomes.length === 0) {
+        alert('No program outcomes available');
+        return;
+      }
+      const newConnection = {
+        type: 'program',
+        targetId: programOutcomes[0].id,
+        percentageIndex: percentageIndex
+      };
+      const updatedComponent = {
+        ...component,
+        connections: [...(component.connections || []), newConnection]
+      };
+      onUpdate && onUpdate(updatedComponent);
+    }
   };
 
   return (
     <div className={`component-card ${type}`}>
       <div className="card-header">
         <div className="card-title-wrapper">
-          {isEditingName ? (
-            <div className="title-edit">
-              <input
-                type="text"
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                className="name-edit-input"
-                onBlur={persistNameChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    persistNameChange();
-                  } else if (e.key === 'Escape') {
-                    setNameValue(component.name || '');
-                    setIsEditingName(false);
-                  }
-                }}
-                autoFocus
-                placeholder="Enter name"
-              />
-            </div>
-          ) : (
-            <h3 className="card-title">{component.name}</h3>
-          )}
-          {!isStatic && !isEditingName && (
-            <button
-              className="small-icon-button edit name-edit-button"
-              onClick={() => setIsEditingName(true)}
-              title="Rename component"
-            >
-              Edit
-            </button>
-          )}
+          <h3 className="card-title">{component.name}</h3>
         </div>
         {component.detail && (
           <Tooltip content={component.detail} position="top">
@@ -239,60 +232,17 @@ const ComponentCard = ({
         <div className="grade-section">
           <div className="section-header">
             <span className="section-label">Grade</span>
+            {!isStatic && type !== 'learning' && type !== 'program' && (
+              <button
+                className="small-icon-button add"
+                onClick={() => setShowGradeInput(!showGradeInput)}
+              >
+                {showGradeInput ? 'Cancel' : 'Add'}
+              </button>
+            )}
           </div>
-<<<<<<< HEAD
-          {type === 'assessment' && !isStatic ? (
-            <input
-              type="number"
-              placeholder="Enter grade"
-              value={gradeValue}
-              min="0"
-              max="100"
-              step="1"
-              onChange={(e) => {
-                const { value } = e.target;
-                if (value === '') {
-                  setGradeValue('');
-                  return;
-                }
-                const numeric = Number(value);
-                if (Number.isNaN(numeric)) return;
-                if (numeric < 0) {
-                  setGradeValue('0');
-                } else if (numeric > 100) {
-                  setGradeValue('100');
-                } else {
-                  setGradeValue(value);
-                }
-              }}
-              onBlur={persistAssessmentGrade}
-              onKeyDown={(e) => {
-                if (['e', 'E', '+', '-', '.'].includes(e.key)) {
-                  e.preventDefault();
-                  return;
-                }
-                if (e.key === 'Enter') {
-                  persistAssessmentGrade();
-                  e.preventDefault();
-                }
-              }}
-              className="grade-input"
-            />
-          ) : (
-            <div className="grade-display">
-              <span className="grade-value">
-                {(component.grades || [])[0] ?? 'N/A'}
-              </span>
-            </div>
-          )}
-          {type === 'learning' && (
-            <div className="computed-wrapper">
-              <span className="section-label">Computed:</span>
-              <span className="grade-value">{calculateTotalGrade()}</span>
-              {!isStatic && (
-=======
-          
-           {showGradeInput && type !== 'learning' && (
+
+          {showGradeInput && type !== 'learning' && (
             <div className="input-form">
               <select
                 value={selectedStudentForGrade}
@@ -315,7 +265,7 @@ const ComponentCard = ({
                 className="grade-input"
                 disabled={!selectedStudentForGrade}
               />
-              <button 
+              <button
                 className="submit-button"
                 onClick={addGrade}
                 disabled={!gradeValue || !selectedStudentForGrade}
@@ -339,89 +289,89 @@ const ComponentCard = ({
                   <div className="grade-connections">
                     {(component.connections || [])
                       .map((c, originalIdx) => ({ c, originalIdx }))
-                    .map(({ c: connection, originalIdx }) => (
-                      <div key={originalIdx} className="connection" style={{ gap: 10 }}>
-                        <span className="percentage">
-                          {(component.percentages || [])[connection.percentageIndex]}%
-                        </span>
-                        <span className="arrow">→</span>
-                        {editingConnectionIndex === originalIdx ? (
-                          <>
-                            {type === 'assessment' ? (
-                              <select
-                                className="percentage-input"
-                                style={{ width: 180, marginBottom: 0 }}
-                                value={editingConnectionTargetId}
-                                onChange={(e) => setEditingConnectionTargetId(e.target.value)}
-                              >
-                                {learningOutcomes.map(lo => (
-                                  <option key={lo.id} value={lo.id}>{lo.name}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <select
-                                className="percentage-input"
-                                style={{ width: 180, marginBottom: 0 }}
-                                value={editingConnectionTargetId}
-                                onChange={(e) => setEditingConnectionTargetId(e.target.value)}
-                              >
-                                {programOutcomes.map(po => (
-                                  <option key={po.id} value={po.id}>{po.name}</option>
-                                ))}
-                              </select>
-                            )}
-                            <button
-                              className="small-icon-button save"
-                              onClick={() => {
-                                const updated = [...(component.connections || [])];
-                                const newTargetId = isNaN(parseInt(editingConnectionTargetId))
-                                  ? editingConnectionTargetId
-                                  : parseInt(editingConnectionTargetId);
-                                updated[originalIdx] = {
-                                  ...updated[originalIdx],
-                                  targetId: newTargetId
-                                };
-                                const updatedComponent = { ...component, connections: updated };
-                                onUpdate && onUpdate(updatedComponent);
-                                setEditingConnectionIndex(null);
-                                setEditingConnectionTargetId('');
-                              }}
-                            >Save</button>
-                            <button
-                              className="small-icon-button cancel"
-                              onClick={() => {
-                                setEditingConnectionIndex(null);
-                                setEditingConnectionTargetId('');
-                              }}
-                            >Cancel</button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="target">
-                              {connection.type === 'learning' 
-                                ? learningOutcomes.find(lo => lo.id === connection.targetId)?.name
-                                : programOutcomes.find(po => po.id === connection.targetId)?.name
-                              }
-                            </span>
-                            <button
-                              className="small-icon-button edit"
-                              onClick={() => {
-                                setEditingConnectionIndex(originalIdx);
-                                setEditingConnectionTargetId(String(connection.targetId));
-                              }}
-                            >Edit</button>
-                            <button
-                              className="small-icon-button delete"
-                              onClick={() => {
-                                const updated = (component.connections || []).filter((_, i) => i !== originalIdx);
-                                const updatedComponent = { ...component, connections: updated };
-                                onUpdate && onUpdate(updatedComponent);
-                              }}
-                            >Delete</button>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                      .map(({ c: connection, originalIdx }) => (
+                        <div key={originalIdx} className="connection" style={{ gap: 10 }}>
+                          <span className="percentage">
+                            {(component.percentages || [])[connection.percentageIndex]}%
+                          </span>
+                          <span className="arrow">→</span>
+                          {editingConnectionIndex === originalIdx ? (
+                            <>
+                              {type === 'assessment' ? (
+                                <select
+                                  className="percentage-input"
+                                  style={{ width: 180, marginBottom: 0 }}
+                                  value={editingConnectionTargetId}
+                                  onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                                >
+                                  {learningOutcomes.map(lo => (
+                                    <option key={lo.id} value={lo.id}>{lo.name}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <select
+                                  className="percentage-input"
+                                  style={{ width: 180, marginBottom: 0 }}
+                                  value={editingConnectionTargetId}
+                                  onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                                >
+                                  {programOutcomes.map(po => (
+                                    <option key={po.id} value={po.id}>{po.name}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                className="small-icon-button save"
+                                onClick={() => {
+                                  const updated = [...(component.connections || [])];
+                                  const newTargetId = isNaN(parseInt(editingConnectionTargetId))
+                                    ? editingConnectionTargetId
+                                    : parseInt(editingConnectionTargetId);
+                                  updated[originalIdx] = {
+                                    ...updated[originalIdx],
+                                    targetId: newTargetId
+                                  };
+                                  const updatedComponent = { ...component, connections: updated };
+                                  onUpdate && onUpdate(updatedComponent);
+                                  setEditingConnectionIndex(null);
+                                  setEditingConnectionTargetId('');
+                                }}
+                              >Save</button>
+                              <button
+                                className="small-icon-button cancel"
+                                onClick={() => {
+                                  setEditingConnectionIndex(null);
+                                  setEditingConnectionTargetId('');
+                                }}
+                              >Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="target">
+                                {connection.type === 'learning'
+                                  ? learningOutcomes.find(lo => lo.id === connection.targetId)?.name
+                                  : programOutcomes.find(po => po.id === connection.targetId)?.name
+                                }
+                              </span>
+                              <button
+                                className="small-icon-button edit"
+                                onClick={() => {
+                                  setEditingConnectionIndex(originalIdx);
+                                  setEditingConnectionTargetId(String(connection.targetId));
+                                }}
+                              >Edit</button>
+                              <button
+                                className="small-icon-button delete"
+                                onClick={() => {
+                                  const updated = (component.connections || []).filter((_, i) => i !== originalIdx);
+                                  const updatedComponent = { ...component, connections: updated };
+                                  onUpdate && onUpdate(updatedComponent);
+                                }}
+                              >Delete</button>
+                            </>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 </div>
               );
@@ -430,11 +380,10 @@ const ComponentCard = ({
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span className="section-label">Computed:</span>
                 <span className="grade-value">{calculateTotalGrade()}</span>
->>>>>>> super-user
                 <button className="small-icon-button save" onClick={approveLearningOutcomeGrade}>Approve</button>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
           {type === 'program' && (
             <div className="computed-wrapper">
               <span className="section-label">Computed:</span>
@@ -446,6 +395,236 @@ const ComponentCard = ({
           )}
         </div>
 
+        {/* Percentages Section */}
+        {type !== 'program' && (
+          <div className="percentages-section">
+            <div className="section-header">
+              <span className="section-label">Percentages</span>
+              {!isStatic && (
+                <button
+                  className="small-icon-button add"
+                  onClick={() => {
+                    setShowPercentageCount(!showPercentageCount);
+                    setShowPercentageInput(false);
+                  }}
+                >
+                  {showPercentageCount ? 'Cancel' : 'Add'}
+                </button>
+              )}
+            </div>
+
+            {showPercentageCount && (
+              <div className="input-form">
+                <input
+                  type="number"
+                  placeholder="Enter percentage"
+                  value={percentageCount}
+                  onChange={(e) => setPercentageCount(e.target.value)}
+                  className="percentage-input"
+                  min="1"
+                  max="100"
+                />
+                <button
+                  className="submit-button"
+                  onClick={() => {
+                    const count = parseInt(percentageCount);
+                    if (isNaN(count) || count <= 0) {
+                      alert('Please enter a valid number');
+                      return;
+                    }
+                    setPercentageFieldsCount(count);
+                    setShowPercentageInput(true);
+                    setPercentageCount('');
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {showPercentageInput && (
+              <div className="input-form">
+                {Array.from({ length: percentageFieldsCount }, (_, i) => (
+                  <input
+                    key={i}
+                    type="number"
+                    placeholder={`Percentage ${i + 1}`}
+                    value={percentageValues[i] || ''}
+                    onChange={(e) => setPercentageValues({ ...percentageValues, [i]: e.target.value })}
+                    className="percentage-input"
+                  />
+                ))}
+                <button
+                  className="submit-button"
+                  onClick={addPercentage}
+                >
+                  Add Percentage
+                </button>
+              </div>
+            )}
+
+            <div className="percentages-list">
+              {(component.percentages || []).map((pct, index) => (
+                <div key={index} className="percentage-item">
+                  {editingPercentageIndex === index ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        value={editingPercentageValue}
+                        onChange={(e) => setEditingPercentageValue(e.target.value)}
+                        className="percentage-input"
+                        style={{ marginBottom: 0 }}
+                      />
+                      <button
+                        className="small-icon-button save"
+                        onClick={() => updatePercentage(index, editingPercentageValue)}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="small-icon-button cancel"
+                        onClick={() => {
+                          setEditingPercentageIndex(null);
+                          setEditingPercentageValue('');
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="percentage-value">{pct}%</span>
+                      {!isStatic && (
+                        <>
+                          <button
+                            className="small-icon-button edit"
+                            onClick={() => {
+                              setEditingPercentageIndex(index);
+                              setEditingPercentageValue(String(pct));
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="small-icon-button delete"
+                            onClick={() => deletePercentage(index)}
+                          >
+                            Delete
+                          </button>
+                          <button
+                            className="small-icon-button add"
+                            onClick={() => addConnection(index)}
+                          >
+                            Connect
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Connections for this percentage */}
+                  <div className="connections-list">
+                    {(component.connections || [])
+                      .map((c, originalIdx) => ({ c, originalIdx }))
+                      .filter(({ c }) => c.percentageIndex === index)
+                      .map(({ c: connection, originalIdx }) => (
+                        <div key={originalIdx} className="connection">
+                          <span className="arrow">→</span>
+                          {editingConnectionIndex === originalIdx ? (
+                            <>
+                              {type === 'assessment' ? (
+                                <select
+                                  className="percentage-input"
+                                  style={{ width: 180, marginBottom: 0 }}
+                                  value={editingConnectionTargetId}
+                                  onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                                >
+                                  {learningOutcomes.map(lo => (
+                                    <option key={lo.id} value={lo.id}>{lo.name}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <select
+                                  className="percentage-input"
+                                  style={{ width: 180, marginBottom: 0 }}
+                                  value={editingConnectionTargetId}
+                                  onChange={(e) => setEditingConnectionTargetId(e.target.value)}
+                                >
+                                  {programOutcomes.map(po => (
+                                    <option key={po.id} value={po.id}>{po.name}</option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                className="small-icon-button save"
+                                onClick={() => {
+                                  const updated = [...(component.connections || [])];
+                                  const newTargetId = isNaN(parseInt(editingConnectionTargetId))
+                                    ? editingConnectionTargetId
+                                    : parseInt(editingConnectionTargetId);
+                                  updated[originalIdx] = {
+                                    ...updated[originalIdx],
+                                    targetId: newTargetId
+                                  };
+                                  const updatedComponent = { ...component, connections: updated };
+                                  onUpdate && onUpdate(updatedComponent);
+                                  setEditingConnectionIndex(null);
+                                  setEditingConnectionTargetId('');
+                                }}
+                              >Save</button>
+                              <button
+                                className="small-icon-button cancel"
+                                onClick={() => {
+                                  setEditingConnectionIndex(null);
+                                  setEditingConnectionTargetId('');
+                                }}
+                              >Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="target">
+                                {connection.type === 'learning'
+                                  ? learningOutcomes.find(lo => lo.id === connection.targetId)?.name
+                                  : programOutcomes.find(po => po.id === connection.targetId)?.name
+                                }
+                              </span>
+                              {!isStatic && (
+                                <>
+                                  <button
+                                    className="small-icon-button edit"
+                                    onClick={() => {
+                                      setEditingConnectionIndex(originalIdx);
+                                      setEditingConnectionTargetId(String(connection.targetId));
+                                    }}
+                                  >Edit</button>
+                                  <button
+                                    className="small-icon-button delete"
+                                    onClick={() => {
+                                      const updated = (component.connections || []).filter((_, i) => i !== originalIdx);
+                                      const updatedComponent = { ...component, connections: updated };
+                                      onUpdate && onUpdate(updatedComponent);
+                                    }}
+                                  >Delete</button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Total Grade */}
+        {type !== 'program' && (
+          <div className="total-grade">
+            <span className="total-label">Total Grade:</span>
+            <span className="total-value">{calculateTotalGrade()}</span>
+          </div>
+        )}
       </div>
     </div>
   );

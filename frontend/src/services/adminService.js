@@ -30,7 +30,7 @@ const adminService = {
 
   // Learning Outcomes (LO)
   getLearningOutcomes: async (courseId = null) => {
-    const url = courseId 
+    const url = courseId
       ? `/courses/${courseId}/learning-outcomes/`
       : '/learning-outcomes/';
     const { data } = await apiClient.get(url);
@@ -38,7 +38,7 @@ const adminService = {
   },
 
   createLearningOutcome: async (loData, courseId = null) => {
-    const url = courseId 
+    const url = courseId
       ? `/courses/${courseId}/learning-outcomes/`
       : '/learning-outcomes/';
     const { data } = await apiClient.post(url, loData);
@@ -84,11 +84,11 @@ const adminService = {
       // Fallback: get all enrollments and filter by course
       try {
         const allEnrollments = await apiClient.get('/enrollments/');
-        const enrollments = Array.isArray(allEnrollments.data) 
-          ? allEnrollments.data 
+        const enrollments = Array.isArray(allEnrollments.data)
+          ? allEnrollments.data
           : (allEnrollments.data?.enrollments || []);
-        return enrollments.filter(e => 
-          e.course_id?.toString() === courseId.toString() || 
+        return enrollments.filter(e =>
+          e.course_id?.toString() === courseId.toString() ||
           e.course?.id?.toString() === courseId.toString()
         );
       } catch (fallbackError) {
@@ -147,6 +147,141 @@ const adminService = {
     return data;
   },
 
+  // Bulk create students with progress tracking
+  bulkCreateStudents: async (studentsData, onProgress = null) => {
+    const results = {
+      successful: [],
+      failed: [],
+      total: studentsData.length
+    };
+
+    for (let i = 0; i < studentsData.length; i++) {
+      const student = studentsData[i];
+      try {
+        const created = await adminService.createStudent(student);
+        results.successful.push({ ...student, id: created.id });
+
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentsData.length,
+            student: student,
+            success: true
+          });
+        }
+      } catch (error) {
+        results.failed.push({
+          student: student,
+          error: error.response?.data?.message || error.message || 'Unknown error'
+        });
+
+        // Call progress callback for failures too
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentsData.length,
+            student: student,
+            success: false,
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+    }
+
+    return results;
+  },
+
+  // Bulk update students with progress tracking
+  bulkUpdateStudents: async (studentIds, updateData, onProgress = null) => {
+    const results = {
+      successful: [],
+      failed: [],
+      total: studentIds.length
+    };
+
+    for (let i = 0; i < studentIds.length; i++) {
+      const studentId = studentIds[i];
+      try {
+        const updated = await adminService.updateStudent(studentId, updateData);
+        results.successful.push(updated);
+
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentIds.length,
+            studentId: studentId,
+            success: true
+          });
+        }
+      } catch (error) {
+        results.failed.push({
+          studentId: studentId,
+          error: error.response?.data?.message || error.message || 'Unknown error'
+        });
+
+        // Call progress callback for failures too
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentIds.length,
+            studentId: studentId,
+            success: false,
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+    }
+
+    return results;
+  },
+
+  // Bulk delete students with progress tracking
+  bulkDeleteStudents: async (studentIds, onProgress = null) => {
+    const results = {
+      successful: [],
+      failed: [],
+      total: studentIds.length
+    };
+
+    for (let i = 0; i < studentIds.length; i++) {
+      const studentId = studentIds[i];
+      try {
+        await adminService.deleteStudent(studentId);
+        results.successful.push(studentId);
+
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentIds.length,
+            studentId: studentId,
+            success: true
+          });
+        }
+      } catch (error) {
+        results.failed.push({
+          studentId: studentId,
+          error: error.response?.data?.message || error.message || 'Unknown error'
+        });
+
+        // Call progress callback for failures too
+        if (onProgress) {
+          onProgress({
+            current: i + 1,
+            total: studentIds.length,
+            studentId: studentId,
+            success: false,
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+    }
+
+    return results;
+  },
+
   assignStudentToCourse: async (studentId, courseId) => {
     console.log('[DEBUG] assignStudentToCourse called:', {
       studentId,
@@ -154,19 +289,19 @@ const adminService = {
       url: `/admin/students/${studentId}/assign-course/`,
       body: { course_id: courseId }
     });
-    
+
     try {
       const response = await apiClient.post(`/admin/students/${studentId}/assign-course/`, {
         course_id: courseId
       });
-      
+
       console.log('[DEBUG] assignStudentToCourse response:', {
         status: response.status,
         statusText: response.statusText,
         data: response.data,
         headers: response.headers
       });
-      
+
       // Check if response indicates success
       if (response.status >= 200 && response.status < 300) {
         console.log('[DEBUG] ✅ Course assignment successful on backend');
@@ -182,7 +317,7 @@ const adminService = {
       } else {
         console.error('[DEBUG] ❌ Course assignment failed - unexpected status:', response.status);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('[DEBUG] ❌ assignStudentToCourse error:', {
@@ -208,14 +343,14 @@ const adminService = {
         dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
         dataLength: Array.isArray(response.data) ? response.data.length : (response.data?.enrollments?.length || 0)
       });
-      
+
       // Backend returns array directly
       const data = response.data;
       if (Array.isArray(data)) {
         console.log('[DEBUG] ✅ Returning enrollments array with', data.length, 'items');
         return data;
       }
-      
+
       // Fallback: if response is wrapped in object
       const enrollments = data?.enrollments || [];
       console.log('[DEBUG] ⚠️ Response was not array, extracted enrollments:', enrollments.length);
@@ -236,7 +371,7 @@ const adminService = {
       enrollmentId,
       url: `/admin/students/${studentId}/enrollments/${enrollmentId}/`
     });
-    
+
     try {
       const response = await apiClient.delete(`/admin/students/${studentId}/enrollments/${enrollmentId}/`);
       console.log('[DEBUG] removeStudentFromCourse response:', {
@@ -244,13 +379,13 @@ const adminService = {
         statusText: response.statusText,
         data: response.data
       });
-      
+
       if (response.status >= 200 && response.status < 300) {
         console.log('[DEBUG] ✅ Course removal successful on backend');
       } else {
         console.error('[DEBUG] ❌ Course removal failed - unexpected status:', response.status);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('[DEBUG] ❌ removeStudentFromCourse error:', {

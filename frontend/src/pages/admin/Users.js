@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useOutletContext, useSearchParams, useNavigate } from 'react-router-dom';
 import useAsyncResource from '../../hooks/useAsyncResource';
 import adminService from '../../services/adminService';
@@ -7,6 +7,8 @@ import ErrorState from '../../components/common/ErrorState';
 import DataTable from '../../components/admin/DataTable';
 import Modal from '../../components/admin/Modal';
 import FormField from '../../components/admin/FormField';
+import BulkStudentUpload from '../../components/admin/BulkStudentUpload';
+import BulkActionsBar from '../../components/admin/BulkActionsBar';
 import clsx from 'clsx';
 
 const Users = () => {
@@ -18,6 +20,7 @@ const Users = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManageCoursesModalOpen, setIsManageCoursesModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [managingCoursesUser, setManagingCoursesUser] = useState(null);
   const [studentEnrollments, setStudentEnrollments] = useState([]);
@@ -39,6 +42,16 @@ const Users = () => {
   });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // Filtering state
+  const [filters, setFilters] = useState({
+    major: '',
+    cohort: '',
+    advisor: ''
+  });
+
+  // Selection state
+  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
 
   const isStudentTab = activeTab === 'students';
 
@@ -492,10 +505,96 @@ const Users = () => {
     }
   };
 
+  // Filtered students based on selected filters
+  const filteredStudents = useMemo(() => {
+    if (!isStudentTab || !studentsData) return studentsData;
+
+    return studentsData.filter(student => {
+      if (filters.major && student.major !== filters.major) return false;
+      if (filters.cohort && student.cohort !== filters.cohort) return false;
+      if (filters.advisor && student.advisor !== filters.advisor) return false;
+      return true;
+    });
+  }, [studentsData, filters, isStudentTab]);
+
+  // Bulk update handler
+  const handleBulkUpdate = async (field, value) => {
+    if (selectedStudentIds.size === 0) {
+      alert('Lütfen en az bir öğrenci seçin');
+      return;
+    }
+
+    try {
+      setError(null);
+      setSuccess(null);
+
+      const studentIds = Array.from(selectedStudentIds);
+      let results;
+
+      // Handle delete action separately
+      if (field === 'delete') {
+        results = await adminService.bulkDeleteStudents(
+          studentIds,
+          (progress) => {
+            console.log('Bulk delete progress:', progress);
+          }
+        );
+      } else {
+        // Handle update actions
+        const updateData = { [field]: value };
+        results = await adminService.bulkUpdateStudents(
+          studentIds,
+          updateData,
+          (progress) => {
+            console.log('Bulk update progress:', progress);
+          }
+        );
+      }
+
+      // Clear selection
+      setSelectedStudentIds(new Set());
+
+      // Show results
+      const actionLabel = field === 'delete' ? 'silindi' : 'güncellendi';
+      if (results.failed.length === 0) {
+        setSuccess(`✓ ${results.successful.length} öğrenci başarıyla ${actionLabel}`);
+      } else {
+        setError(`${results.failed.length} öğrenci ${actionLabel.replace('ndi', 'nemedi')}. ${results.successful.length} öğrenci ${actionLabel}.`);
+      }
+
+      // Refresh students
+      await refetchStudents();
+
+      // Clear message after delay
+      setTimeout(() => {
+        setSuccess(null);
+        setError(null);
+      }, 5000);
+    } catch (err) {
+      setError(err.message || 'Toplu işlem başarısız oldu');
+    }
+  };
+
+  // Filter handlers
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+    // Clear selection when filters change
+    setSelectedStudentIds(new Set());
+  };
+
+  const handleClearFilters = () => {
+    setFilters({ major: '', cohort: '', advisor: '' });
+    setSelectedStudentIds(new Set());
+  };
+
+  const handleClearSelection = () => {
+    setSelectedStudentIds(new Set());
+  };
+
   // Only show loading/error for the active tab
   const isLoading = isStudentTab ? studentsLoading : professorsLoading;
   const fetchError = isStudentTab ? studentsError : professorsError;
-  const data = isStudentTab ? studentsData : professorsData;
+  const data = isStudentTab ? filteredStudents : professorsData;
   const refetch = isStudentTab ? refetchStudents : refetchProfessors;
 
   if (isLoading) return <LoadingState label={`Loading ${isStudentTab ? 'Students' : 'Professors'}...`} />;
@@ -524,12 +623,22 @@ const Users = () => {
           <h2 className="text-2xl font-semibold">User Management</h2>
           <p className="text-sm text-slate-500">Manage students and professors</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
-        >
-          + Create {isStudentTab ? 'Student' : 'Professor'}
-        </button>
+        <div className="flex gap-3">
+          {isStudentTab && (
+            <button
+              onClick={() => setIsBulkUploadModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 text-sm font-semibold text-brand-600 border-2 border-brand-600 rounded-xl hover:bg-brand-50 dark:hover:bg-brand-500/10"
+            >
+              📤 Toplu Yükle
+            </button>
+          )}
+          <button
+            onClick={() => handleOpenModal()}
+            className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700"
+          >
+            + Create {isStudentTab ? 'Student' : 'Professor'}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800">
@@ -557,12 +666,95 @@ const Users = () => {
         </button>
       </div>
 
+      {/* Filter Section - Only for Students */}
+      {isStudentTab && (
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Filtrele:
+            </span>
+
+            <select
+              value={filters.major}
+              onChange={(e) => handleFilterChange('major', e.target.value)}
+              className="px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+            >
+              <option value="">Tüm Bölümler</option>
+              {studentOptions.majors.map((major) => (
+                <option key={major} value={major}>
+                  {major}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.cohort}
+              onChange={(e) => handleFilterChange('cohort', e.target.value)}
+              className="px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+            >
+              <option value="">Tüm Sınıflar</option>
+              {studentOptions.cohorts.map((cohort) => (
+                <option key={cohort} value={cohort}>
+                  {cohort}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.advisor}
+              onChange={(e) => handleFilterChange('advisor', e.target.value)}
+              className="px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700"
+            >
+              <option value="">Tüm Danışmanlar</option>
+              {studentOptions.advisors.map((advisor) => (
+                <option key={advisor} value={advisor}>
+                  {advisor}
+                </option>
+              ))}
+            </select>
+
+            {(filters.major || filters.cohort || filters.advisor) && (
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white rounded-lg border border-slate-300 hover:bg-slate-50 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-600"
+              >
+                Filtreleri Temizle
+              </button>
+            )}
+
+            <span className="ml-auto text-sm text-slate-500 dark:text-slate-400">
+              {data?.length || 0} öğrenci gösteriliyor
+              {studentsData && data?.length !== studentsData.length && (
+                <span className="text-brand-600 dark:text-brand-400">
+                  {' '}(toplam {studentsData.length} öğrenciden)
+                </span>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="p-3 text-sm text-emerald-600 bg-emerald-50 rounded-lg dark:bg-emerald-500/10 dark:text-emerald-400">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="p-3 text-sm text-rose-600 bg-rose-50 rounded-lg dark:bg-rose-500/10 dark:text-rose-400">
+          {error}
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         data={data || []}
         onEdit={handleOpenModal}
         onDelete={handleDelete}
         emptyMessage={`No ${isStudentTab ? 'Students' : 'Professors'} found. Create your first ${isStudentTab ? 'student' : 'professor'}.`}
+        selectable={isStudentTab}
+        selectedRows={selectedStudentIds}
+        onSelectionChange={setSelectedStudentIds}
         customActions={
           isStudentTab
             ? (row) => (
@@ -812,6 +1004,36 @@ const Users = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Bulk Upload Modal */}
+      <Modal
+        isOpen={isBulkUploadModalOpen}
+        onClose={() => setIsBulkUploadModalOpen(false)}
+        title="Toplu Öğrenci Yükle"
+        size="lg"
+      >
+        <BulkStudentUpload
+          onClose={() => setIsBulkUploadModalOpen(false)}
+          onUploadComplete={(results) => {
+            // Refresh students list
+            refetchStudents();
+            // Close modal after showing results briefly
+            setTimeout(() => {
+              setIsBulkUploadModalOpen(false);
+            }, 3000);
+          }}
+        />
+      </Modal>
+
+      {/* Bulk Actions Bar */}
+      {isStudentTab && selectedStudentIds.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedStudentIds.size}
+          studentOptions={studentOptions}
+          onBulkUpdate={handleBulkUpdate}
+          onClearSelection={handleClearSelection}
+        />
       )}
     </div>
   );
